@@ -626,14 +626,14 @@ sleep 30 && curl http://localhost:3003/dashboard
 - 🏷️ **Automatic categorization**: By project, session and message type
 - 📈 **Real-time metrics**: Activity by hours and projects
 
-### 🚀 **Optimized Performance**
+### 🚀 **Monolithic Performance**
 
-- **⚡ Ultra-fast**: Instant access to messages in RAM
-- **💾 Persistent**: Automatic Redis backup without performance impact
-- **🔄 Auto-scaling**: Automatically adapts to data volume
-- **🧹 Self-cleaning**: Automatic cleanup to prevent overflow
-- **📈 Efficient**: Minimal resource usage (~50MB base RAM)
-- **🔒 Stable**: No complex database dependencies
+- **⚡ Internal Speed**: No network latency between services (localhost communication)
+- **💾 Unified Persistence**: Single Docker volume with MongoDB + Redis data
+- **🔄 Supervisor Management**: All processes managed centrally in one container  
+- **🧹 Self-contained**: MongoDB, Redis, Node.js, Nginx all integrated
+- **📈 Resource Efficient**: Single container overhead vs multiple containers
+- **🔒 Simple Architecture**: No container networking or orchestration complexity
 
 ## 🔧 Troubleshooting
 
@@ -928,11 +928,11 @@ curl -H "X-API-Key: claude_api_secret_2024_change_me" \
 #### API not responding
 
 ```bash
-# Check container is running
+# Check monolithic container is running
 docker compose ps
 
-# Review logs
-docker compose logs api
+# Review integrated logs (all services)
+docker compose logs claude-logger
 
 # Check connectivity
 curl http://localhost:3003/health
@@ -941,15 +941,18 @@ curl http://localhost:3003/health
 #### Storage and performance
 
 ```bash
-# Check hybrid storage
+# Check internal storage (MongoDB + Redis)
 docker exec claude-logger-monolith curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3000/api/stats
 
-# View memory usage
-docker exec claude-logger-monolith ps aux | grep node
+# View processes inside container
+docker exec claude-logger-monolith ps aux
 
-# Check Redis
+# Check internal Redis
 docker exec claude-logger-monolith redis-cli ping
+
+# Check internal MongoDB
+docker exec claude-logger-monolith mongosh --eval "db.adminCommand('ping')"
 ```
 
 ### Debug Logs
@@ -979,7 +982,7 @@ MIT License - see `LICENSE` for details.
 
 - Built for [Claude Code](https://claude.ai/code)
 - Uses [Model Context Protocol (MCP)](https://modelcontextprotocol.io)
-- Integration with MongoDB, Redis, and Docker
+- Monolithic architecture with MongoDB, Redis, Node.js, and Nginx integration
 
 ---
 
