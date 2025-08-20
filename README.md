@@ -255,8 +255,15 @@ MONGODB_URI=mongodb://admin:claude_logger_2024@localhost:27017/conversations?aut
 REDIS_URL=redis://localhost:6379
 
 # Storage System:
-# - MongoDB: Main persistence (90-day TTL)
+# - MongoDB: Main persistence (indefinite by default)
 # - Redis: Fast cache for queries
+# - Optional: MONGODB_TTL_SECONDS env var for auto-expiration
+
+# Optional TTL Configuration (uncomment to enable)
+# MONGODB_TTL_SECONDS=7776000   # 90 days (7776000 seconds)
+# MONGODB_TTL_SECONDS=2592000   # 30 days (2592000 seconds)  
+# MONGODB_TTL_SECONDS=604800    # 7 days (604800 seconds)
+# If not set, conversations persist indefinitely
 ```
 
 ## 🏗️ Monolithic Architecture
@@ -795,15 +802,16 @@ docker compose up -d --build
 |----------|---------------|---------|----------|
 | **Nginx** | 3003 (exposed) | ✅ Running | Reverse proxy and load balancer |
 | **Node.js API** | 3000 | ✅ Running | REST API and MCP server |
-| **MongoDB** | 27017 | ✅ Running | Main database (90-day TTL) |
+| **MongoDB** | 27017 | ✅ Running | Main database (indefinite persistence) |
 | **Redis** | 6379 | ✅ Running | Fast secondary cache |
 | **Supervisor** | - | ✅ Running | Process management |
 
 ### 💾 **Storage System**
 
-- **🗄️ MongoDB**: Main persistence with automatic 90-day TTL
+- **🗄️ MongoDB**: Main persistence (indefinite by default, configurable TTL)
 - **🚀 Redis**: Fast cache for frequent queries  
 - **🔄 Auto-failover**: MongoDB → Redis (redundancy)
+- **⚙️ Configurable TTL**: Optional MONGODB_TTL_SECONDS environment variable
 - **🧹 Auto-cleanup**: Automatic cleanup at all levels
 - **📊 Smart routing**: Read from MongoDB, cache in Redis
 
@@ -813,12 +821,27 @@ docker compose up -d --build
 
 The system uses optimized dual storage:
 
+#### **MongoDB Persistence Configuration**
+```bash
+# Default: Indefinite persistence (recommended)
+# No environment variable needed
+
+# Optional: Set TTL for automatic expiration
+export MONGODB_TTL_SECONDS=7776000  # 90 days
+export MONGODB_TTL_SECONDS=2592000  # 30 days
+export MONGODB_TTL_SECONDS=604800   # 7 days
+
+# Restart container to apply changes
+docker compose down && docker compose up -d
+```
+
+#### **Redis Cache Configuration**
 ```javascript
 // Configure Redis settings  
 const REDIS_SYNC_INTERVAL = 5000;  // ms for sync
 
-// Customize auto-cleanup
-const CLEANUP_OLDER_THAN = 7 * 24 * 60 * 60 * 1000;  // 7 days
+// Redis TTL for individual messages (24 hours)
+const REDIS_MESSAGE_TTL = 86400;  // seconds
 ```
 
 ### Customize Logging Hook

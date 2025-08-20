@@ -556,7 +556,15 @@ async function initializeMongoDB() {
         await messagesCollection.createIndex({ timestamp: -1 });
         await messagesCollection.createIndex({ project_name: 1, timestamp: -1 });
         await messagesCollection.createIndex({ session_id: 1 });
-        await messagesCollection.createIndex({ created_at: 1 }, { expireAfterSeconds: 7776000 }); // 90 days TTL
+        
+        // Optional TTL configuration - by default, data persists indefinitely
+        const ttlSeconds = process.env.MONGODB_TTL_SECONDS;
+        if (ttlSeconds && ttlSeconds > 0) {
+            await messagesCollection.createIndex({ created_at: 1 }, { expireAfterSeconds: parseInt(ttlSeconds) });
+            console.log(`📅 MongoDB TTL: Data will expire after ${ttlSeconds} seconds (${Math.round(ttlSeconds/86400)} days)`);
+        } else {
+            console.log('♾️  MongoDB: Indefinite persistence (no TTL configured)');
+        }
         
         console.log('✅ Connected to MongoDB');
         return true;
@@ -1220,12 +1228,17 @@ async function startServer() {
         console.log('✅ Server ready to receive hooks');
         
         if (mongoConnected) {
-            console.log('💾 MongoDB: Full persistence with 90-day TTL');
+            const ttlSeconds = process.env.MONGODB_TTL_SECONDS;
+            if (ttlSeconds && ttlSeconds > 0) {
+                console.log(`💾 MongoDB: Full persistence with ${Math.round(ttlSeconds/86400)}-day TTL`);
+            } else {
+                console.log('💾 MongoDB: Full persistence (indefinite)');
+            }
         }
         if (redisConnected) {
             console.log('🔄 Redis: Secondary backup active');
         }
-        console.log('🚀 Memory: Fast cache (1000 messages)');
+        console.log('⚡ System: Ready for conversation logging');
     });
 }
 
