@@ -7,8 +7,8 @@
 ## 📋 Features
 
 - 🔄 **Automatic logging** of all Claude Code conversations
-- 💾 **Persistent Storage Architecture** MongoDB + Redis + Memory with Docker volumes
-- 🔄 **Data Flow**: MongoDB (persistent) → Redis (cache) → Memory (temp) for optimal performance
+- 💾 **Optimized Storage Architecture** MongoDB + Redis (5000 msgs) with Docker volumes
+- 🔄 **Data Flow**: MongoDB (persistent) → Redis (high-availability cache) for optimal performance
 - 🔍 **Intelligent search** with freshness prioritization and resolved issue detection
 - 🤖 **Integrated MCP server** for efficient queries from Claude
 - 🏗️ **Multi-container architecture** with internal MongoDB, Redis, and Node.js services
@@ -42,8 +42,8 @@ curl http://localhost:3003/health
 #
 # Data Flow:
 # 1. MongoDB: Persistent storage survives container restarts
-# 2. Redis: Fast cache layer for Claude Code queries (24h TTL)
-# 3. Memory: Temporary cache for maximum dashboard speed
+# 2. Redis: High-availability cache for MCP queries (5000 msgs, 24h TTL)
+# Dashboard reads directly from MongoDB (no memory cache needed)
 ```
 
 ### 3. Configure Claude Code Hook
@@ -571,10 +571,10 @@ graph LR
 
 ### 🔄 **Data Flow Process**
 
-1. **📝 Message Received** → Triggers storage cascade
+1. **📝 Message Received** → Triggers optimized storage flow
 2. **💾 MongoDB (Primary)** → Persistent storage with Docker volume
-3. **⚡ Redis (Cache)** → Fast access for Claude Code queries (24h TTL)
-4. **🧠 Memory (Temp)** → Ultra-fast dashboard updates
+3. **⚡ Redis (High-Availability Cache)** → 5000 messages for MCP queries (24h TTL)
+4. **📊 Dashboard** → Reads directly from MongoDB (acceptable ~50ms response)
 5. **🔄 Auto-Recovery** → System loads from MongoDB after restart
 
 ### 🐳 **Docker Volumes Configuration**
@@ -600,8 +600,8 @@ volumes:
 
 | Operation | Source | Speed | Persistence |
 |-----------|--------|-------|-------------|
-| Dashboard Load | Memory | ~1ms | ❌ Temporary |
-| Claude Code Query | Redis | ~10ms | ✅ 24h cache |
+| MCP Claude Code Query | Redis | ~10ms | ✅ 24h cache (5000 msgs) |
+| Dashboard Load | MongoDB | ~50ms | ✅ Permanent |
 | Historical Search | MongoDB | ~50ms | ✅ Permanent |
 | System Recovery | MongoDB | ~500ms | ✅ Full restore |
 

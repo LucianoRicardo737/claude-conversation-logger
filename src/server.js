@@ -23,8 +23,7 @@ let mongoClient;
 let messagesCollection;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:claude_logger_2024@localhost:27017/conversations?authSource=admin';
 
-// In-memory storage as fallback
-const inMemoryMessages = [];
+// Session tracking for analytics
 const inMemorySessions = new Map();
 
 // Middleware
@@ -107,7 +106,7 @@ async function saveMessage(data) {
     return await saveToStorage(message);
 }
 
-// Helper function to save with correct flow: MongoDB → Redis → Memory
+// Helper function to save with optimized flow: MongoDB → Redis (5000 msgs for MCP)
 async function saveToStorage(record) {
     let mongoSaveSuccess = false;
     
@@ -122,7 +121,7 @@ async function saveToStorage(record) {
         console.warn('❌ MongoDB save failed:', error.message);
     }
 
-    // 2. SECOND: Update Redis cache for fast Claude Code reads
+    // 2. SECOND: Update Redis cache for high-availability MCP queries (5000 msgs)
     try {
         if (redisClient.isOpen) {
             const recordForCache = {
@@ -134,9 +133,9 @@ async function saveToStorage(record) {
             // Save individual message
             await redisClient.setEx(`msg:${record.id}`, 86400, JSON.stringify(recordForCache)); // 24h TTL
             
-            // Update recent messages list for fast queries
+            // Update recent messages list for fast MCP queries (increased capacity)
             await redisClient.lPush('messages:recent', JSON.stringify(recordForCache));
-            await redisClient.lTrim('messages:recent', 0, 999); // Keep last 1000
+            await redisClient.lTrim('messages:recent', 0, 4999); // Keep last 5000 messages
             
             // Invalidate dashboard cache to force refresh
             await redisClient.del('dashboard:stats');
@@ -145,18 +144,6 @@ async function saveToStorage(record) {
         }
     } catch (error) {
         console.warn('⚠️  Redis cache update failed:', error.message);
-    }
-
-    // 3. THIRD: Update memory cache (only for dashboard speed)
-    inMemoryMessages.push({
-        ...record,
-        timestamp: record.timestamp.toISOString(),
-        created_at: record.created_at.toISOString()
-    });
-    
-    // Keep only last 500 in memory to prevent overflow
-    if (inMemoryMessages.length > 500) {
-        inMemoryMessages.shift();
     }
 
     return record;
@@ -240,7 +227,7 @@ app.post('/api/token-usage', validateApiKey, async (req, res) => {
     }
 });
 
-// Helper function to get messages with correct flow: Redis → MongoDB → Memory
+// Helper function to get messages with optimized flow: Redis → MongoDB (no memory fallback)
 async function getMessagesFromStorage(limit = 10, project = null, session = null) {
     let messages = [];
     
@@ -292,26 +279,9 @@ async function getMessagesFromStorage(limit = 10, project = null, session = null
         console.warn('❌ MongoDB read failed:', error.message);
     }
     
-    // 3. THIRD: Fallback to memory (temporary cache)
-    messages = [...inMemoryMessages];
-    
-    // Filter by project if specified
-    if (project) {
-        messages = messages.filter(msg => msg.project_name === project);
-    }
-
-    // Filter by session if specified
-    if (session) {
-        messages = messages.filter(msg => msg.session_id === session);
-    }
-
-    // Sort by timestamp and limit
-    messages = messages
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, limit);
-    
-    console.log(`🧠 Retrieved ${messages.length} messages from memory (fallback)`);
-    return messages;
+    // Return empty array if both Redis and MongoDB failed
+    console.log('⚠️  Returning empty messages array - both Redis cache and MongoDB unavailable');
+    return [];
 }
 
 // Get recent messages API endpoint
@@ -464,27 +434,9 @@ async function getDashboardStats() {
         console.warn('❌ MongoDB stats failed:', error.message);
     }
     
-    // Fallback to memory
-    const messageCount = inMemoryMessages.length;
-    const projectCounts = {};
-    const tokenMetrics = inMemoryMessages.filter(msg => msg.message_type === 'token_metric');
-    const recentMessages = inMemoryMessages
-        .filter(msg => new Date(msg.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000));
-
-    inMemoryMessages.forEach(msg => {
-        projectCounts[msg.project_name] = (projectCounts[msg.project_name] || 0) + 1;
-    });
-    
-    console.log('🧠 Generated dashboard stats from memory (fallback)');
-    
-    return {
-        messageCount,
-        projectCounts,
-        tokenMetrics,
-        recentMessages,
-        totalCost: tokenMetrics.reduce((sum, metric) => sum + (metric.metadata?.cost_usd || 0), 0),
-        totalTokens: tokenMetrics.reduce((sum, metric) => sum + (metric.metadata?.token_count || 0), 0)
-    };
+    // Return empty stats if both Redis and MongoDB failed
+    console.log('⚠️  Returning empty stats - both Redis cache and MongoDB unavailable');
+    return stats;
 }
 
 // System stats
