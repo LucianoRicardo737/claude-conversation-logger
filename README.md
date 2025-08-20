@@ -465,7 +465,7 @@ curl -I http://localhost:3003/dashboard
 - **🔄 Auto-Refresh**: Page refreshes every 30 seconds
 - **📊 Real-Time Data**: Always shows current statistics
 - **🚀 Fast Loading**: Single HTML page with CDN assets
-- **💾 No Database**: Uses in-memory statistics for speed
+- **💾 Direct Access**: Reads statistics directly from MongoDB
 - **📱 Mobile Optimized**: Responsive grid layout
 
 ### 🛡️ **Security & Access**
@@ -814,8 +814,8 @@ docker compose up -d --build
 The system uses optimized dual storage:
 
 ```javascript
-// Configure cache limits
-const REDIS_BACKUP_INTERVAL = 5000;  // ms for sync
+// Configure Redis settings  
+const REDIS_SYNC_INTERVAL = 5000;  // ms for sync
 
 // Customize auto-cleanup
 const CLEANUP_OLDER_THAN = 7 * 24 * 60 * 60 * 1000;  // 7 days
