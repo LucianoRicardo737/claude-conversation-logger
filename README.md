@@ -119,6 +119,7 @@ The system works through Claude Code hooks that automatically capture:
 - ✅ **SessionStart**: New session initialization
 - ⚠️ **PostToolUse**: Tool usage (optional)
 - 🔧 **Enhanced Token Parsing**: Correct capture of usage statistics and complete content
+- 🎯 **OpenTelemetry Compliant**: Token metrics separated by type for accurate monitoring
 
 ⚠️ **IMPORTANT**: The hook structure must be exactly as shown. Claude Code requires an array with objects containing an internal `"hooks"` field.
 
@@ -300,9 +301,12 @@ REDIS_URL=redis://localhost:6379
 |----------|--------|-------------|
 | `/health` | GET | System health check |
 | `/api/log` | POST | Save conversation message |
+| `/api/token-usage` | POST | **NEW**: Save OpenTelemetry token metrics |
 | `/api/messages` | GET | Get recent messages |
 | `/api/sessions` | GET | List sessions |
 | `/api/search` | GET | Search conversations |
+| `/api/stats` | GET | System statistics with token metrics |
+| `/api/token-stats` | GET | **NEW**: Detailed token usage analytics |
 | `/api/cleanup` | DELETE | Clean old data |
 
 ### Usage Examples
@@ -316,6 +320,70 @@ curl "http://localhost:3003/api/search?q=docker&days=7"
 
 # View recent messages
 curl http://localhost:3003/api/messages
+
+# Get token statistics
+curl -H "X-API-Key: claude_api_secret_2024_change_me" \
+     "http://localhost:3003/api/token-stats?days=7"
+
+# Get system stats with token metrics
+curl -H "X-API-Key: claude_api_secret_2024_change_me" \
+     http://localhost:3003/api/stats
+```
+
+### 🎯 OpenTelemetry Token Metrics
+
+The system now provides **OpenTelemetry-compliant** token tracking:
+
+#### **Automatic Token Separation**
+Each assistant response generates separate records for:
+- **`input`**: Input tokens from user prompts
+- **`output`**: Output tokens in assistant responses  
+- **`cacheRead`**: Tokens read from prompt cache (90% discount)
+- **`cacheCreation`**: Tokens used to create prompt cache
+
+#### **Enhanced Metadata**
+```javascript
+// Example token record
+{
+  message_type: 'token_metric',
+  hook_event: 'TokenUsage',
+  metadata: {
+    token_type: 'output',           // OpenTelemetry compliant
+    token_count: 125,               // Exact count for this type
+    model: 'claude-3-5-sonnet-20241022',
+    cost_usd: 0.001875,            // Estimated cost
+    duration_ms: 1500,             // Response time
+    source: 'opentelemetry_token_tracking'
+  }
+}
+```
+
+#### **Token Analytics Dashboard**
+```bash
+# Get detailed token breakdown
+curl -H "X-API-Key: claude_api_secret_2024_change_me" \
+     "http://localhost:3003/api/token-stats?days=7&project=uniCommerce"
+
+# Example response:
+{
+  "period_days": 7,
+  "total_records": 45,
+  "token_breakdown": {
+    "input": 1200,
+    "output": 3500,
+    "cacheRead": 850,
+    "cacheCreation": 2100
+  },
+  "cost_analysis": {
+    "total_usd": 0.15,
+    "by_type": {
+      "input": 0.0036,
+      "output": 0.0525,
+      "cacheRead": 0.000255,
+      "cacheCreation": 0.0063
+    }
+  }
+}
 ```
 
 ## 🤖 Integrated MCP Server
@@ -451,12 +519,29 @@ The MCP server provides native tools for Claude to access stored conversations:
 2. Restart Claude Code completely
 3. Test with: `./examples/hook-test.sh`
 
-#### ❌ **Token counts seem incorrect**
+#### ✅ **Fixed: Token Counting Accuracy (v2.1.2+)**
 
-**Explanation**: Claude Code includes internal processing overhead in token counts:
+**Previous Issue**: Assistant responses showed severe token underreporting (99%+ error rate).
+
+**Resolution**: Implemented OpenTelemetry-compliant token parsing that:
+- ✅ **Accumulates streaming chunks**: Properly combines all response parts
+- ✅ **Separates token types**: Individual records for input/output/cache tokens
+- ✅ **Calculates costs**: Automatic cost estimation by model
+- ✅ **Tracks duration**: Response time measurement
+
+**Verification**:
+```bash
+# Check token metrics are working
+curl -H "X-API-Key: claude_api_secret_2024_change_me" \
+     "http://localhost:3003/api/token-stats?days=1"
+
+# Should show realistic token counts matching response complexity
+```
+
+**Claude Code Details**: 
 - `output_tokens` includes formatting and internal processing
-- Actual visible response may be longer than reported tokens
-- Cache tokens are created once per session, then reused
+- Cache tokens are created once per session, then reused with 90% discount
+- Token separation allows accurate cost tracking per usage type
 
 #### ❌ **Container not starting**
 

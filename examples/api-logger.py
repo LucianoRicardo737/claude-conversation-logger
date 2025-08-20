@@ -52,14 +52,67 @@ def send_to_api(endpoint, data):
         print(f"Unexpected error: {e}", file=sys.stderr)
         return False
 
+def parse_usage_tokens(usage_data):
+    """Parse usage data according to OpenTelemetry specification"""
+    if not usage_data or not isinstance(usage_data, dict):
+        return []
+    
+    token_records = []
+    
+    # Map Claude usage fields to OpenTelemetry token types
+    token_mapping = {
+        'input_tokens': 'input',
+        'output_tokens': 'output', 
+        'cache_creation_input_tokens': 'cacheCreation',
+        'cache_read_input_tokens': 'cacheRead'
+    }
+    
+    for usage_field, otel_type in token_mapping.items():
+        token_count = usage_data.get(usage_field, 0)
+        if token_count > 0:  # Only record non-zero token counts
+            token_records.append({
+                'type': otel_type,
+                'token_count': token_count
+            })
+    
+    return token_records
+
+def estimate_cost_usd(usage_data, model):
+    """Estimate cost in USD based on usage and model"""
+    if not usage_data or not isinstance(usage_data, dict):
+        return 0.0
+    
+    # Approximate pricing for Claude models (as of 2024)
+    # These are estimates - actual costs may vary
+    pricing = {
+        'claude-3-5-sonnet-20241022': {
+            'input': 0.000003,   # $3 per 1M tokens
+            'output': 0.000015,  # $15 per 1M tokens
+            'cache_read': 0.0000003,   # $0.30 per 1M tokens
+            'cache_write': 0.000003    # $3.75 per 1M tokens
+        }
+    }
+    
+    model_pricing = pricing.get(model, pricing['claude-3-5-sonnet-20241022'])
+    
+    total_cost = 0.0
+    total_cost += usage_data.get('input_tokens', 0) * model_pricing['input']
+    total_cost += usage_data.get('output_tokens', 0) * model_pricing['output']
+    total_cost += usage_data.get('cache_read_input_tokens', 0) * model_pricing['cache_read']
+    total_cost += usage_data.get('cache_creation_input_tokens', 0) * model_pricing['cache_write']
+    
+    return round(total_cost, 6)  # Round to 6 decimal places
+
 def parse_transcript_for_last_assistant_message(transcript_path):
-    """Parse transcript to extract the last assistant message"""
+    """Parse transcript to extract the last assistant message with improved token parsing"""
     
     if not os.path.exists(transcript_path):
         return None
     
     last_assistant_message = None
     accumulated_usage = None
+    first_timestamp = None
+    last_timestamp = None
     
     try:
         with open(transcript_path, 'r', encoding='utf-8') as f:
@@ -79,6 +132,13 @@ def parse_transcript_for_last_assistant_message(transcript_path):
                         for item in content_array:
                             if item.get('type') == 'text':
                                 text_content += item.get('text', '')
+                        
+                        # Track timestamps for duration calculation
+                        entry_timestamp = entry.get('timestamp', '')
+                        if entry_timestamp:
+                            if not first_timestamp:
+                                first_timestamp = entry_timestamp
+                            last_timestamp = entry_timestamp
                         
                         # Get usage from the entry - it may only appear in the last chunk
                         current_usage = entry['message'].get('usage', {})
@@ -108,6 +168,23 @@ def parse_transcript_for_last_assistant_message(transcript_path):
             # Apply the accumulated usage to the final message
             if last_assistant_message and accumulated_usage:
                 last_assistant_message['usage'] = accumulated_usage
+                
+                # Calculate duration if we have timestamps
+                duration_ms = 0
+                if first_timestamp and last_timestamp and first_timestamp != last_timestamp:
+                    try:
+                        from datetime import datetime
+                        first_dt = datetime.fromisoformat(first_timestamp.replace('Z', '+00:00'))
+                        last_dt = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
+                        duration_ms = int((last_dt - first_dt).total_seconds() * 1000)
+                    except:
+                        duration_ms = 0
+                
+                last_assistant_message['duration_ms'] = duration_ms
+                last_assistant_message['cost_usd'] = estimate_cost_usd(
+                    accumulated_usage, 
+                    last_assistant_message.get('model', '')
+                )
                     
     except Exception as e:
         print(f"Error parsing transcript: {e}", file=sys.stderr)
@@ -150,9 +227,36 @@ def main():
                         'source': 'stop_hook_assistant',
                         'model': assistant_msg.get('model', 'unknown'),
                         'usage': assistant_msg.get('usage', {}),
-                        'uuid': assistant_msg.get('uuid', '')
+                        'uuid': assistant_msg.get('uuid', ''),
+                        'cost_usd': assistant_msg.get('cost_usd', 0.0),
+                        'duration_ms': assistant_msg.get('duration_ms', 0)
                     }
                 })
+                
+                # Send separate token usage events (OpenTelemetry compliant)
+                usage_data = assistant_msg.get('usage', {})
+                if usage_data:
+                    token_records = parse_usage_tokens(usage_data)
+                    model = assistant_msg.get('model', 'unknown')
+                    
+                    for token_record in token_records:
+                        send_to_api('token-usage', {
+                            'session_id': session_id,
+                            'project_name': project_name,
+                            'hook_event': 'TokenUsage',
+                            'message_type': 'token_metric',
+                            'content': f"Token usage: {token_record['type']} = {token_record['token_count']}",
+                            'metadata': {
+                                'source': 'opentelemetry_token_tracking',
+                                'model': model,
+                                'token_type': token_record['type'],
+                                'token_count': token_record['token_count'],
+                                'cost_usd': assistant_msg.get('cost_usd', 0.0),
+                                'duration_ms': assistant_msg.get('duration_ms', 0),
+                                'uuid': assistant_msg.get('uuid', ''),
+                                'timestamp': assistant_msg.get('timestamp', '')
+                            }
+                        })
             
         elif hook_event == 'UserPromptSubmit':
             prompt = input_data.get('prompt', '[prompt not captured]')

@@ -1,7 +1,7 @@
 {
   "name": "claude-conversation-logger",
-  "version": "1.0.0",
-  "description": "Containerized conversation logger for Claude Code",
+  "version": "2.1.2",
+  "description": "Containerized conversation logger for Claude Code with OpenTelemetry token metrics",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
