@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+package conversation;
+
+// Definición del servicio principal
+service ConversationService {
+  // Stream de mensajes en tiempo real
+  rpc StreamMessages(Empty) returns (stream MessageEvent);
+  
+  // Obtener árbol de conversaciones por proyecto y sesión
+  rpc GetConversationTree(TreeRequest) returns (TreeResponse);
+  
+  // Búsqueda avanzada de conversaciones
+  rpc SearchConversations(SearchRequest) returns (SearchResponse);
+  
+  // Marcar conversaciones como importantes
+  rpc MarkImportant(MarkRequest) returns (MarkResponse);
+  
+  // Exportar conversación completa
+  rpc ExportConversation(ExportRequest) returns (ExportResponse);
+  
+  // Obtener estadísticas en tiempo real
+  rpc GetLiveStats(Empty) returns (stream StatsEvent);
+}
+
+// Mensajes base
+message Empty {}
+
+message MessageEvent {
+  string type = 1; // "new_message", "session_start", "session_end"
+  Message message = 2;
+  int64 timestamp = 3;
+}
+
+message Message {
+  string id = 1;
+  string session_id = 2;
+  string project_name = 3;
+  string message_type = 4; // "user", "assistant", "system"
+  string content = 5;
+  string hook_event = 6;
+  int64 timestamp = 7;
+  MessageMetadata metadata = 8;
+}
+
+message MessageMetadata {
+  string source = 1;
+  string model = 2;
+  TokenUsage usage = 3;
+  double cost_usd = 4;
+  int32 duration_ms = 5;
+}
+
+message TokenUsage {
+  int32 input_tokens = 1;
+  int32 output_tokens = 2;
+  int32 cache_creation_input_tokens = 3;
+  int32 cache_read_input_tokens = 4;
+  string service_tier = 5;
+}
+
+// Árbol de conversaciones
+message TreeRequest {
+  string project_filter = 1; // Opcional: filtrar por proyecto
+  int32 limit = 2; // Límite de sesiones por proyecto
+  int32 hours_back = 3; // Horas hacia atrás (defecto: 24)
+}
+
+message TreeResponse {
+  repeated ProjectNode projects = 1;
+  int32 total_messages = 2;
+  int32 total_sessions = 3;
+}
+
+message ProjectNode {
+  string name = 1;
+  int32 message_count = 2;
+  repeated SessionNode sessions = 3;
+  int64 last_activity = 4;
+}
+
+message SessionNode {
+  string session_id = 1;
+  string short_id = 2; // Primeros 8 caracteres
+  int32 message_count = 3;
+  int64 start_time = 4;
+  int64 last_activity = 5;
+  bool is_active = 6; // Si tiene actividad en últimos 30min
+  bool is_marked = 7; // Si está marcado como importante
+  repeated Message recent_messages = 8; // Últimos 3 mensajes para preview
+}
+
+// Búsqueda
+message SearchRequest {
+  string query = 1; // Texto a buscar
+  string project_filter = 2; // Opcional: proyecto específico
+  string session_filter = 3; // Opcional: sesión específica
+  string message_type_filter = 4; // Opcional: "user", "assistant", "system"
+  int64 start_date = 5; // Timestamp de inicio (opcional)
+  int64 end_date = 6; // Timestamp de fin (opcional)
+  bool only_marked = 7; // Solo conversaciones marcadas
+  int32 limit = 8; // Límite de resultados
+  int32 offset = 9; // Para paginación
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+  int32 total_count = 2;
+  int32 returned_count = 3;
+  bool has_more = 4;
+}
+
+message SearchResult {
+  Message message = 1;
+  repeated string highlights = 2; // Fragmentos del texto que coinciden
+  float relevance_score = 3;
+  SessionContext context = 4; // Contexto de la sesión
+}
+
+message SessionContext {
+  string session_id = 1;
+  string project_name = 2;
+  int32 total_messages = 3;
+  int64 session_start = 4;
+  bool is_marked = 5;
+}
+
+// Marcar como importante
+message MarkRequest {
+  string session_id = 1;
+  bool is_marked = 2; // true para marcar, false para desmarcar
+  string note = 3; // Nota opcional del usuario
+  repeated string tags = 4; // Etiquetas personalizadas
+}
+
+message MarkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Exportación
+message ExportRequest {
+  string session_id = 1;
+  string format = 2; // "json", "markdown", "txt"
+  bool include_metadata = 3;
+}
+
+message ExportResponse {
+  string content = 1;
+  string filename = 2;
+  string mime_type = 3;
+  int32 message_count = 4;
+}
+
+// Estadísticas en tiempo real
+message StatsEvent {
+  string type = 1; // "message_count", "token_usage", "cost_update", "project_activity"
+  LiveStats stats = 2;
+  int64 timestamp = 3;
+}
+
+message LiveStats {
+  int32 total_messages = 1;
+  int32 total_sessions = 2;
+  int32 active_projects = 3;
+  double total_cost_usd = 4;
+  int64 total_tokens = 5;
+  repeated ProjectStats project_stats = 6;
+  RecentActivity recent_activity = 7;
+}
+
+message ProjectStats {
+  string name = 1;
+  int32 message_count = 2;
+  int32 session_count = 3;
+  int64 last_activity = 4;
+}
+
+message RecentActivity {
+  repeated Message last_messages = 1; // Últimos 10 mensajes
+  int32 messages_last_hour = 2;
+  int32 active_sessions = 3;
+}

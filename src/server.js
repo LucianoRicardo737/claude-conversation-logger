@@ -6,6 +6,13 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getGrpcServer } from './grpc/grpc-server.js';
+import { injectDependencies, broadcastNewMessage } from './grpc/grpc-handlers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -144,6 +151,9 @@ async function saveToStorage(record) {
             await redisClient.del('dashboard:stats');
             
             console.log(`⚡ Cached in Redis: ${record.id}`);
+            
+            // Broadcast nuevo mensaje via gRPC para tiempo real
+            broadcastNewMessage(record);
         }
     } catch (error) {
         console.warn('⚠️  Redis cache update failed:', error.message);
@@ -375,6 +385,507 @@ app.get('/api/search', validateApiKey, async (req, res) => {
     }
 });
 
+// New API endpoints for advanced dashboard
+
+// Get conversation tree (projects → sessions → messages)
+app.get('/api/conversations/tree', validateApiKey, async (req, res) => {
+    try {
+        const { 
+            project = '', 
+            limit = 50, 
+            hours_back = 24 
+        } = req.query;
+
+        if (!messagesCollection) {
+            return res.status(503).json({ error: 'Database not available' });
+        }
+
+        const hoursAgo = new Date(Date.now() - (parseInt(hours_back) * 60 * 60 * 1000));
+        
+        // Query base con filtro de tiempo
+        const baseQuery = {
+            timestamp: { $gte: hoursAgo }
+        };
+        
+        if (project) {
+            baseQuery.project_name = project;
+        }
+
+        // Agregación para obtener estructura de árbol
+        const pipeline = [
+            { $match: baseQuery },
+            { $sort: { timestamp: -1 } },
+            {
+                $group: {
+                    _id: {
+                        project: '$project_name',
+                        session: '$session_id'
+                    },
+                    messages: { $push: '$$ROOT' },
+                    message_count: { $sum: 1 },
+                    start_time: { $min: '$timestamp' },
+                    last_activity: { $max: '$timestamp' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$_id.project',
+                    sessions: {
+                        $push: {
+                            session_id: '$_id.session',
+                            short_id: { $substr: ['$_id.session', 0, 8] },
+                            message_count: '$message_count',
+                            start_time: '$start_time',
+                            last_activity: '$last_activity',
+                            is_active: {
+                                $gt: ['$last_activity', new Date(Date.now() - 30 * 60 * 1000)]
+                            },
+                            recent_messages: { $slice: ['$messages', -3] } // Últimos 3 mensajes
+                        }
+                    },
+                    total_messages: { $sum: '$message_count' },
+                    last_activity: { $max: '$last_activity' }
+                }
+            },
+            { $sort: { last_activity: -1 } },
+            { $limit: parseInt(limit) }
+        ];
+
+        const results = await messagesCollection.aggregate(pipeline).toArray();
+        
+        // Obtener información de marcadores desde Redis
+        const enrichedResults = await Promise.all(results.map(async project => {
+            const sessionsWithMarks = await Promise.all(project.sessions.map(async session => {
+                let isMarked = false;
+                if (redisClient?.isOpen) {
+                    try {
+                        const markInfo = await redisClient.get(`marked:${session.session_id}`);
+                        isMarked = !!markInfo;
+                    } catch (error) {
+                        // Ignorar errores de Redis
+                    }
+                }
+                
+                return {
+                    ...session,
+                    is_marked: isMarked,
+                    recent_messages: session.recent_messages.map(msg => ({
+                        id: msg._id,
+                        message_type: msg.message_type,
+                        content: msg.content.substring(0, 150) + (msg.content.length > 150 ? '...' : ''),
+                        timestamp: msg.timestamp
+                    }))
+                };
+            }));
+
+            return {
+                name: project._id,
+                message_count: project.total_messages,
+                sessions: sessionsWithMarks,
+                last_activity: project.last_activity
+            };
+        }));
+
+        const totalMessages = enrichedResults.reduce((sum, p) => sum + p.message_count, 0);
+        const totalSessions = enrichedResults.reduce((sum, p) => sum + p.sessions.length, 0);
+
+        res.json({
+            projects: enrichedResults,
+            total_messages: totalMessages,
+            total_sessions: totalSessions,
+            filters: { project, hours_back: parseInt(hours_back) }
+        });
+
+    } catch (error) {
+        console.error('Error getting conversation tree:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get detailed conversation by session ID
+app.get('/api/conversations/:sessionId', validateApiKey, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { include_metadata = 'true' } = req.query;
+
+        if (!messagesCollection) {
+            return res.status(503).json({ error: 'Database not available' });
+        }
+
+        // Obtener todos los mensajes de la sesión
+        const messages = await messagesCollection
+            .find({ session_id: sessionId })
+            .sort({ timestamp: 1 })
+            .toArray();
+
+        if (messages.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        // Obtener información de marcador
+        let markInfo = null;
+        if (redisClient?.isOpen) {
+            try {
+                const markData = await redisClient.get(`marked:${sessionId}`);
+                if (markData) {
+                    markInfo = JSON.parse(markData);
+                }
+            } catch (error) {
+                // Ignorar errores de Redis
+            }
+        }
+
+        // Formatear mensajes
+        const formattedMessages = messages.map(msg => {
+            const base = {
+                id: msg._id,
+                message_type: msg.message_type,
+                content: msg.content,
+                hook_event: msg.hook_event,
+                timestamp: msg.timestamp
+            };
+
+            if (include_metadata === 'true' && msg.metadata) {
+                base.metadata = msg.metadata;
+            }
+
+            return base;
+        });
+
+        res.json({
+            session_id: sessionId,
+            short_id: sessionId.substring(0, 8),
+            project_name: messages[0].project_name,
+            message_count: messages.length,
+            start_time: messages[0].timestamp,
+            end_time: messages[messages.length - 1].timestamp,
+            is_marked: !!markInfo,
+            mark_info: markInfo,
+            messages: formattedMessages
+        });
+
+    } catch (error) {
+        console.error('Error getting conversation:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Advanced search endpoint
+app.get('/api/search/advanced', validateApiKey, async (req, res) => {
+    try {
+        const {
+            q = '',
+            project = '',
+            session = '',
+            message_type = '',
+            start_date = '',
+            end_date = '',
+            only_marked = 'false',
+            limit = '50',
+            offset = '0'
+        } = req.query;
+
+        if (!messagesCollection) {
+            return res.status(503).json({ error: 'Database not available' });
+        }
+
+        // Construir query de búsqueda
+        const searchQuery = {};
+
+        // Búsqueda de texto
+        if (q) {
+            searchQuery.$or = [
+                { content: { $regex: q, $options: 'i' } },
+                { project_name: { $regex: q, $options: 'i' } }
+            ];
+        }
+
+        // Filtros específicos
+        if (project) {
+            searchQuery.project_name = project;
+        }
+
+        if (session) {
+            searchQuery.session_id = session;
+        }
+
+        if (message_type) {
+            searchQuery.message_type = message_type;
+        }
+
+        // Filtro de fechas
+        if (start_date || end_date) {
+            searchQuery.timestamp = {};
+            if (start_date) {
+                searchQuery.timestamp.$gte = new Date(start_date);
+            }
+            if (end_date) {
+                searchQuery.timestamp.$lte = new Date(end_date);
+            }
+        }
+
+        // Contar total
+        const totalCount = await messagesCollection.countDocuments(searchQuery);
+        
+        // Obtener resultados paginados
+        const messages = await messagesCollection
+            .find(searchQuery)
+            .sort({ timestamp: -1 })
+            .skip(parseInt(offset))
+            .limit(parseInt(limit))
+            .toArray();
+
+        // Filtrar por marcados si se solicita
+        let filteredResults = messages;
+        if (only_marked === 'true' && redisClient?.isOpen) {
+            const sessionIds = [...new Set(messages.map(m => m.session_id))];
+            const markedSessions = new Set();
+            
+            for (const sessionId of sessionIds) {
+                try {
+                    const markData = await redisClient.get(`marked:${sessionId}`);
+                    if (markData) {
+                        markedSessions.add(sessionId);
+                    }
+                } catch (error) {
+                    // Ignorar errores
+                }
+            }
+            
+            filteredResults = messages.filter(msg => markedSessions.has(msg.session_id));
+        }
+
+        // Formatear resultados con contexto
+        const results = await Promise.all(filteredResults.map(async msg => {
+            let isMarked = false;
+            if (redisClient?.isOpen) {
+                try {
+                    const markData = await redisClient.get(`marked:${msg.session_id}`);
+                    isMarked = !!markData;
+                } catch (error) {
+                    // Ignorar errores
+                }
+            }
+
+            // Obtener contexto de la sesión
+            const sessionContext = {
+                session_id: msg.session_id,
+                short_id: msg.session_id.substring(0, 8),
+                project_name: msg.project_name,
+                is_marked: isMarked
+            };
+
+            // Crear highlights básicos si hay búsqueda de texto
+            const highlights = [];
+            if (q) {
+                const content = msg.content.toLowerCase();
+                const queryLower = q.toLowerCase();
+                const index = content.indexOf(queryLower);
+                if (index !== -1) {
+                    const start = Math.max(0, index - 50);
+                    const end = Math.min(content.length, index + q.length + 50);
+                    highlights.push(msg.content.substring(start, end));
+                }
+            }
+
+            return {
+                message: {
+                    id: msg._id,
+                    session_id: msg.session_id,
+                    project_name: msg.project_name,
+                    message_type: msg.message_type,
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                },
+                highlights,
+                context: sessionContext,
+                relevance_score: 1.0 // TODO: Implementar scoring real
+            };
+        }));
+
+        res.json({
+            results,
+            pagination: {
+                total_count: totalCount,
+                returned_count: results.length,
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+                has_more: parseInt(offset) + results.length < totalCount
+            },
+            filters: {
+                query: q,
+                project,
+                session,
+                message_type,
+                start_date,
+                end_date,
+                only_marked: only_marked === 'true'
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in advanced search:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Mark/unmark session as important
+app.post('/api/conversations/:sessionId/mark', validateApiKey, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { is_marked = true, note = '', tags = [] } = req.body;
+
+        if (!redisClient?.isOpen) {
+            return res.status(503).json({ error: 'Redis not available' });
+        }
+
+        const key = `marked:${sessionId}`;
+        
+        if (is_marked) {
+            const markData = {
+                marked: true,
+                note,
+                tags: Array.isArray(tags) ? tags : [],
+                marked_at: Date.now(),
+                updated_at: Date.now()
+            };
+            
+            await redisClient.setEx(key, 86400 * 30, JSON.stringify(markData)); // 30 días
+            
+            res.json({
+                success: true,
+                message: 'Conversación marcada como importante',
+                data: markData
+            });
+        } else {
+            await redisClient.del(key);
+            
+            res.json({
+                success: true,
+                message: 'Marca removida de la conversación'
+            });
+        }
+
+    } catch (error) {
+        console.error('Error marking conversation:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Export conversation in different formats
+app.get('/api/conversations/:sessionId/export', validateApiKey, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { format = 'json', include_metadata = 'true' } = req.query;
+
+        if (!messagesCollection) {
+            return res.status(503).json({ error: 'Database not available' });
+        }
+
+        // Obtener todos los mensajes de la sesión
+        const messages = await messagesCollection
+            .find({ session_id: sessionId })
+            .sort({ timestamp: 1 })
+            .toArray();
+
+        if (messages.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        const includeMetadata = include_metadata === 'true';
+        let content, filename, mimeType;
+
+        switch (format) {
+            case 'json':
+                content = JSON.stringify(messages, null, 2);
+                filename = `conversation_${sessionId.substring(0, 8)}.json`;
+                mimeType = 'application/json';
+                break;
+
+            case 'markdown':
+                content = formatAsMarkdown(messages, includeMetadata);
+                filename = `conversation_${sessionId.substring(0, 8)}.md`;
+                mimeType = 'text/markdown';
+                break;
+
+            case 'txt':
+                content = formatAsText(messages, includeMetadata);
+                filename = `conversation_${sessionId.substring(0, 8)}.txt`;
+                mimeType = 'text/plain';
+                break;
+
+            default:
+                return res.status(400).json({ error: 'Unsupported format' });
+        }
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(content);
+
+    } catch (error) {
+        console.error('Error exporting conversation:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Helper functions for export formats
+function formatAsMarkdown(messages, includeMetadata) {
+    const project = messages[0]?.project_name || 'Unknown';
+    const sessionId = messages[0]?.session_id || 'Unknown';
+    const startTime = new Date(messages[0]?.timestamp || Date.now()).toLocaleString();
+    
+    let content = `# Conversación: ${project}\n\n`;
+    content += `**Session ID**: \`${sessionId}\`\n`;
+    content += `**Iniciada**: ${startTime}\n`;
+    content += `**Mensajes**: ${messages.length}\n\n---\n\n`;
+
+    messages.forEach((msg, index) => {
+        const time = new Date(msg.timestamp).toLocaleString();
+        const icon = msg.message_type === 'user' ? '👤' : 
+                    msg.message_type === 'assistant' ? '🤖' : '🔧';
+        
+        content += `## ${icon} ${msg.message_type.charAt(0).toUpperCase() + msg.message_type.slice(1)}\n`;
+        content += `*${time}*\n\n`;
+        content += `${msg.content}\n\n`;
+        
+        if (includeMetadata && msg.metadata) {
+            content += `<details>\n<summary>Metadata</summary>\n\n`;
+            content += `\`\`\`json\n${JSON.stringify(msg.metadata, null, 2)}\n\`\`\`\n\n</details>\n\n`;
+        }
+        
+        if (index < messages.length - 1) {
+            content += '---\n\n';
+        }
+    });
+
+    return content;
+}
+
+function formatAsText(messages, includeMetadata) {
+    const project = messages[0]?.project_name || 'Unknown';
+    const sessionId = messages[0]?.session_id || 'Unknown';
+    const startTime = new Date(messages[0]?.timestamp || Date.now()).toLocaleString();
+    
+    let content = `CONVERSACIÓN: ${project}\n`;
+    content += `Session ID: ${sessionId}\n`;
+    content += `Iniciada: ${startTime}\n`;
+    content += `Mensajes: ${messages.length}\n`;
+    content += '='.repeat(60) + '\n\n';
+
+    messages.forEach((msg, index) => {
+        const time = new Date(msg.timestamp).toLocaleString();
+        content += `[${time}] ${msg.message_type.toUpperCase()}: ${msg.content}\n`;
+        
+        if (includeMetadata && msg.metadata) {
+            content += `METADATA: ${JSON.stringify(msg.metadata, null, 2)}\n`;
+        }
+        
+        content += '\n' + '-'.repeat(40) + '\n\n';
+    });
+
+    return content;
+}
+
 // Helper function to get dashboard stats from persistent storage
 async function getDashboardStats() {
     let stats = {
@@ -570,6 +1081,10 @@ async function initializeMongoDB() {
         }
         
         console.log('✅ Connected to MongoDB');
+        
+        // Inyectar dependencias en los handlers de gRPC
+        injectDependencies(messagesCollection, redisClient);
+        
         return true;
     } catch (error) {
         console.warn('⚠️  MongoDB connection failed, using memory + Redis:', error.message);
@@ -1207,6 +1722,14 @@ async function loadInitialDataToMemory() {
     }
 }
 
+// Dashboard routes (servir archivos estáticos del dashboard)
+app.use('/dashboard', express.static(path.join(__dirname, 'dashboard')));
+
+// Redirigir / al dashboard
+app.get('/', (req, res) => {
+    res.redirect('/dashboard');
+});
+
 // Start server
 async function startServer() {
     const mongoConnected = await initializeMongoDB();
@@ -1229,6 +1752,11 @@ async function startServer() {
         console.log(`📝 API: http://localhost:${PORT}/api/messages`);
         console.log(`🔢 Tokens: http://localhost:${PORT}/api/token-usage`);
         console.log('✅ Server ready to receive hooks');
+        
+        // Inicializar servidor gRPC
+        const grpcServer = getGrpcServer();
+        const grpcPort = process.env.GRPC_PORT || 50051;
+        grpcServer.start(grpcPort);
         
         if (mongoConnected) {
             const ttlSeconds = process.env.MONGODB_TTL_SECONDS;

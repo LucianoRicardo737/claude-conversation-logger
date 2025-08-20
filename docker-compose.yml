@@ -6,7 +6,8 @@ services:
     container_name: claude-logger-monolith
     restart: unless-stopped
     ports:
-      - "3003:3003"
+      - "3003:3003"  # HTTP/REST API
+      - "50051:50051"  # gRPC Server
     volumes:
       - claude_logger_data:/app/data
       - ./logs:/app/logs
