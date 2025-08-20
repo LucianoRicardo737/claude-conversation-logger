@@ -10,6 +10,7 @@ services:
       - "50051:50051"  # gRPC Server
     volumes:
       - claude_logger_data:/app/data
+      - claude_logger_mongodb:/data/db
       - ./logs:/app/logs
     environment:
       - NODE_ENV=production
@@ -32,4 +33,6 @@ services:
 
 volumes:
   claude_logger_data:
+    driver: local
+  claude_logger_mongodb:
     driver: local

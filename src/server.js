@@ -36,10 +36,14 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:claude_logger_20
 // Session tracking for analytics
 const inMemorySessions = new Map();
 
-// Middleware
-app.use(helmet());
+// Middleware - Configuración abierta para desarrollo local
 app.use(compression());
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['*']
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('combined'));
 
@@ -1104,8 +1108,8 @@ async function initializeRedis() {
     }
 }
 
-// Dashboard endpoint - Visual HTML stats dashboard with persistent data
-app.get('/dashboard', async (req, res) => {
+// Legacy dashboard endpoint - moved to /dashboard/legacy to avoid conflict
+app.get('/dashboard/legacy', async (req, res) => {
     try {
         // Get stats from persistent storage
         const stats = await getDashboardStats();
@@ -1487,7 +1491,7 @@ app.get('/dashboard', async (req, res) => {
         <!-- Key Metrics Cards -->
         <div class="grid grid-cols-4">
             <!-- Total Messages -->
-            <a href="/dashboard/messages" class="card-link">
+            <a href="/dashboard/legacy/messages" class="card-link">
                 <div class="card">
                     <div class="metric-card">
                         <div class="metric-info">
@@ -1501,7 +1505,7 @@ app.get('/dashboard', async (req, res) => {
             </a>
 
             <!-- Total Cost -->
-            <a href="/dashboard/costs" class="card-link">
+            <a href="/dashboard/legacy/costs" class="card-link">
                 <div class="card">
                     <div class="metric-card">
                         <div class="metric-info">
@@ -1515,7 +1519,7 @@ app.get('/dashboard', async (req, res) => {
             </a>
 
             <!-- Total Tokens -->
-            <a href="/dashboard/tokens" class="card-link">
+            <a href="/dashboard/legacy/tokens" class="card-link">
                 <div class="card">
                     <div class="metric-card">
                         <div class="metric-info">
@@ -1529,7 +1533,7 @@ app.get('/dashboard', async (req, res) => {
             </a>
 
             <!-- Active Projects -->
-            <a href="/dashboard/projects" class="card-link">
+            <a href="/dashboard/legacy/projects" class="card-link">
                 <div class="card">
                     <div class="metric-card">
                         <div class="metric-info">
@@ -1649,14 +1653,14 @@ app.get('/dashboard', async (req, res) => {
 });
 
 // Dashboard detail pages with persistent data
-app.get('/dashboard/messages', async (req, res) => {
+app.get('/dashboard/legacy/messages', async (req, res) => {
     const stats = await getDashboardStats();
     const messages = await getMessagesFromStorage(100); // Get more for detail view
     const projects = [...new Set(messages.map(msg => msg.project_name))];
     res.send(`<html><head><title>📝 Mensajes</title><style>body{font-family:system-ui;background:#f8fafc;margin:0;padding:24px}.container{max-width:1200px;margin:0 auto}.header{background:white;padding:20px;border-radius:8px;margin-bottom:24px}.list{background:white;border-radius:8px;padding:20px}.item{padding:12px 0;border-bottom:1px solid #e5e7eb}.tag{background:#dbeafe;color:#3b82f6;padding:2px 8px;border-radius:4px;font-size:0.8rem}.back{display:inline-block;background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:4px;margin-top:20px}</style></head><body><div class="container"><div class="header"><a href="/dashboard">← Dashboard</a><h1>📝 Mensajes (${stats.messageCount})</h1><p>Mostrando últimos ${messages.length} mensajes</p></div><div class="list">${messages.slice(0,50).map(msg => `<div class="item"><span class="tag">${msg.project_name}</span> <small>${new Date(msg.timestamp).toLocaleString()}</small><br><strong>${msg.message_type}</strong> - ${msg.session_id.substring(0,8)}...</div>`).join('')}</div><a href="/dashboard" class="back">← Volver</a></div></body></html>`);
 });
 
-app.get('/dashboard/costs', async (req, res) => {
+app.get('/dashboard/legacy/costs', async (req, res) => {
     const stats = await getDashboardStats();
     const tokenMetrics = stats.tokenMetrics;
     const totalCost = stats.totalCost;
@@ -1671,7 +1675,7 @@ app.get('/dashboard/costs', async (req, res) => {
     res.send(`<html><head><title>💰 Costos</title><style>body{font-family:system-ui;background:#f8fafc;margin:0;padding:24px}.container{max-width:1200px;margin:0 auto}.header{background:white;padding:20px;border-radius:8px;margin-bottom:24px}.card{background:white;border-radius:8px;padding:20px;margin-bottom:16px}.metric{font-size:2rem;font-weight:bold;color:#1f2937}.back{display:inline-block;background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:4px;margin-top:20px}table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;border-bottom:1px solid #e5e7eb}</style></head><body><div class="container"><div class="header"><a href="/dashboard">← Dashboard</a><h1>💰 Análisis de Costos</h1></div><div class="card"><h3>Costo Total</h3><div class="metric">$${totalCost.toFixed(4)}</div><p>${tokenMetrics.length} registros de tokens</p></div><div class="card"><h3>Por Modelo</h3><table><tr><th>Modelo</th><th>Tokens</th><th>Requests</th><th>Costo</th></tr>${Object.entries(models).map(([model, data]) => `<tr><td>${model}</td><td>${data.tokens.toLocaleString()}</td><td>${data.requests}</td><td>$${data.cost.toFixed(4)}</td></tr>`).join('')}</table></div><a href="/dashboard" class="back">← Volver</a></div></body></html>`);
 });
 
-app.get('/dashboard/tokens', async (req, res) => {
+app.get('/dashboard/legacy/tokens', async (req, res) => {
     const stats = await getDashboardStats();
     const tokenMetrics = stats.tokenMetrics;
     const tokenTypes = {};
@@ -1685,7 +1689,7 @@ app.get('/dashboard/tokens', async (req, res) => {
     res.send(`<html><head><title>🎯 Tokens</title><style>body{font-family:system-ui;background:#f8fafc;margin:0;padding:24px}.container{max-width:1200px;margin:0 auto}.header{background:white;padding:20px;border-radius:8px;margin-bottom:24px}.card{background:white;border-radius:8px;padding:20px;margin-bottom:16px}.metric{font-size:2rem;font-weight:bold;color:#1f2937}.stat{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6}.back{display:inline-block;background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:4px;margin-top:20px}</style></head><body><div class="container"><div class="header"><a href="/dashboard">← Dashboard</a><h1>🎯 Análisis de Tokens</h1></div><div class="card"><h3>Total de Tokens</h3><div class="metric">${totalTokens.toLocaleString()}</div><p>${Object.keys(tokenTypes).length} tipos diferentes</p></div><div class="card"><h3>Por Tipo</h3>${Object.entries(tokenTypes).map(([type, count]) => `<div class="stat"><span>${type}:</span><strong>${count.toLocaleString()}</strong></div>`).join('')}</div><a href="/dashboard" class="back">← Volver</a></div></body></html>`);
 });
 
-app.get('/dashboard/projects', async (req, res) => {
+app.get('/dashboard/legacy/projects', async (req, res) => {
     const stats = await getDashboardStats();
     const projectCounts = stats.projectCounts;
     const recentProjects = {};
@@ -1722,6 +1726,67 @@ async function loadInitialDataToMemory() {
     }
 }
 
+// Load messages from MongoDB to Redis cache on startup
+async function loadMessagesToRedis() {
+    try {
+        if (!messagesCollection || !redisClient.isOpen) {
+            console.log('⚠️  MongoDB or Redis not available, skipping Redis migration');
+            return;
+        }
+
+        // Check if Redis already has data
+        const existingCount = await redisClient.lLen('messages:recent');
+        if (existingCount > 0) {
+            console.log(`📦 Redis already has ${existingCount} messages, skipping migration`);
+            return;
+        }
+
+        // Load last N messages from MongoDB (according to REDIS_MESSAGE_LIMIT)
+        const recentMessages = await messagesCollection
+            .find({})
+            .sort({ timestamp: -1 })
+            .limit(REDIS_MESSAGE_LIMIT)
+            .toArray();
+
+        if (recentMessages.length === 0) {
+            console.log('📭 No messages found in MongoDB to migrate to Redis');
+            return;
+        }
+
+        console.log(`🔄 Migrating ${recentMessages.length} messages from MongoDB to Redis...`);
+
+        // Clear Redis messages list
+        await redisClient.del('messages:recent');
+
+        // Add messages to Redis in reverse order (oldest first, newest last)
+        const messagesToCache = recentMessages.reverse().map(msg => JSON.stringify({
+            ...msg,
+            timestamp: msg.timestamp.toISOString(),
+            created_at: msg.created_at.toISOString()
+        }));
+
+        if (messagesToCache.length > 0) {
+            await redisClient.lPush('messages:recent', ...messagesToCache);
+            
+            // Also cache individual messages with TTL
+            for (const msg of recentMessages) {
+                const msgForCache = {
+                    ...msg,
+                    timestamp: msg.timestamp.toISOString(),
+                    created_at: msg.created_at.toISOString()
+                };
+                await redisClient.setEx(`msg:${msg.id}`, 86400, JSON.stringify(msgForCache)); // 24h TTL
+            }
+        }
+
+        const finalCount = await redisClient.lLen('messages:recent');
+        console.log(`✅ Successfully migrated ${finalCount} messages to Redis cache`);
+
+    } catch (error) {
+        console.warn('❌ Failed to load messages to Redis:', error.message);
+    }
+}
+
 // Dashboard routes (servir archivos estáticos del dashboard)
 app.use('/dashboard', express.static(path.join(__dirname, 'dashboard')));
 
@@ -1738,6 +1803,11 @@ async function startServer() {
     // Load initial data into memory if MongoDB is available
     if (mongoConnected) {
         await loadInitialDataToMemory();
+    }
+
+    // Load messages from MongoDB to Redis cache if both are available
+    if (mongoConnected && redisConnected) {
+        await loadMessagesToRedis();
     }
     
     let storageInfo = 'In-Memory';

@@ -45,6 +45,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
+# Copiar archivos de Vue.js y Axios desde node_modules a assets
+RUN mkdir -p ./src/dashboard/assets && \
+    cp ./node_modules/vue/dist/vue.global.js ./src/dashboard/assets/ && \
+    cp ./node_modules/axios/dist/axios.min.js ./src/dashboard/assets/
+
 COPY src/ ./src/
 
 # Crear usuario para la aplicación
@@ -61,8 +66,8 @@ COPY config/nginx.conf /etc/nginx/sites-enabled/default
 COPY scripts/start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Exponer puerto
-EXPOSE 3003
+# Exponer puertos
+EXPOSE 3003 50051
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
