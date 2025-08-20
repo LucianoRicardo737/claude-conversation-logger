@@ -7,8 +7,8 @@
 ## 📋 Features
 
 - 🔄 **Automatic logging** of all Claude Code conversations
-- 💾 **Optimized Storage Architecture** MongoDB + Redis (5000 msgs) with Docker volumes
-- 🔄 **Data Flow**: MongoDB (persistent) → Redis (high-availability cache) for optimal performance
+- 💾 **Optimized Storage Architecture** MongoDB + Redis with Docker volumes
+- 🔄 **Data Flow**: MongoDB (persistent) → Redis (cache) for optimal performance
 - 🔍 **Intelligent search** with freshness prioritization and resolved issue detection
 - 🤖 **Integrated MCP server** for efficient queries from Claude
 - 🏗️ **Monolithic architecture** with integrated MongoDB, Redis, Node.js and Nginx
@@ -44,7 +44,7 @@ curl http://localhost:3003/health
 #
 # Data Flow:
 # 1. MongoDB: Persistent storage with Docker volume
-# 2. Redis: High-availability cache for MCP queries (5000 msgs, 24h TTL)
+# 2. Redis: Cache for MCP queries (24h TTL)
 # 3. All services communicate internally via localhost
 ```
 
@@ -254,11 +254,9 @@ API_SECRET=claude_api_secret_2024_change_me
 MONGODB_URI=mongodb://admin:claude_logger_2024@localhost:27017/conversations?authSource=admin
 REDIS_URL=redis://localhost:6379
 
-# Triple Storage System:
+# Storage System:
 # - MongoDB: Main persistence (90-day TTL)
-# - Redis: Fast secondary cache
-# - Memory: Ultra-fast buffer (1000 msgs)
-# - Auto-failover: If MongoDB fails → Redis → Memory
+# - Redis: Fast cache for queries
 ```
 
 ## 🏗️ Monolithic Architecture
@@ -289,10 +287,6 @@ REDIS_URL=redis://localhost:6379
         ║  │(Persistent) │    │   (Cache)   │         ║
         ║  └─────────────┘    └─────────────┘         ║
         ║                                              ║
-        ║  ┌─────────────────────────────────────┐    ║
-        ║  │        Memory Buffer (1000 msgs)    │    ║
-        ║  │         Ultra-fast Access           │    ║
-        ║  └─────────────────────────────────────┘    ║
         ║                                              ║
         ║         Managed by Supervisor               ║
         ╚═══════════════════════════════════════════════╝
@@ -555,7 +549,7 @@ The MCP server provides native tools for Claude to access stored conversations:
 
 ## 💾 **Data Persistence & Storage Architecture**
 
-The system uses a **two-tier storage architecture** within a single container to ensure data persistence and optimal performance:
+The system uses a **dual storage architecture** within a single container to ensure data persistence and optimal performance:
 
 ### 🏗️ **Storage Hierarchy**
 
@@ -577,7 +571,7 @@ graph LR
 
 1. **📝 Message Received** → Triggers optimized storage flow in single container
 2. **💾 MongoDB Internal** → Persistent storage with Docker volume (localhost:27017)
-3. **⚡ Redis Internal** → 5000 messages cache for MCP queries (localhost:6379, 24h TTL)
+3. **⚡ Redis Internal** → Message cache for MCP queries (localhost:6379, 24h TTL)
 4. **📊 Dashboard** → Reads directly from internal MongoDB (~50ms response)
 5. **🔄 Auto-Recovery** → All services restart together via Supervisor
 
@@ -601,7 +595,7 @@ volumes:
 
 | Operation | Source | Speed | Persistence |
 |-----------|--------|-------|-------------|
-| MCP Claude Code Query | Redis Internal | ~10ms | ✅ 24h cache (5000 msgs) |
+| MCP Claude Code Query | Redis Internal | ~10ms | ✅ 24h cache |
 | Dashboard Load | MongoDB Internal | ~50ms | ✅ Permanent |
 | Historical Search | MongoDB Internal | ~50ms | ✅ Permanent |
 | System Recovery | Supervisor + MongoDB | ~500ms | ✅ Full restore |
@@ -803,27 +797,24 @@ docker compose up -d --build
 | **Node.js API** | 3000 | ✅ Running | REST API and MCP server |
 | **MongoDB** | 27017 | ✅ Running | Main database (90-day TTL) |
 | **Redis** | 6379 | ✅ Running | Fast secondary cache |
-| **Memory Buffer** | - | ✅ Running | Ultra-fast buffer (1000 msgs) |
 | **Supervisor** | - | ✅ Running | Process management |
 
-### 💾 **Triple Storage System**
+### 💾 **Storage System**
 
 - **🗄️ MongoDB**: Main persistence with automatic 90-day TTL
-- **🚀 Redis**: Fast secondary cache for frequent queries  
-- **⚡ Memory**: Ultra-fast RAM buffer (1000 messages)
-- **🔄 Auto-failover**: MongoDB → Redis → Memory (complete redundancy)
+- **🚀 Redis**: Fast cache for frequent queries  
+- **🔄 Auto-failover**: MongoDB → Redis (redundancy)
 - **🧹 Auto-cleanup**: Automatic cleanup at all levels
-- **📊 Smart routing**: Read from MongoDB, cache in Memory
+- **📊 Smart routing**: Read from MongoDB, cache in Redis
 
 ## 🔧 Advanced Configuration
 
 ### Customize Storage
 
-The system uses optimized hybrid storage:
+The system uses optimized dual storage:
 
 ```javascript
-// Configure memory limits
-const MAX_MESSAGES = 1000;  // Messages in RAM
+// Configure cache limits
 const REDIS_BACKUP_INTERVAL = 5000;  // ms for sync
 
 // Customize auto-cleanup
@@ -845,7 +836,7 @@ The hook in `examples/hook-setup.py` can be modified to:
 # Check status of all services
 curl http://localhost:3003/health
 
-# Hybrid storage statistics
+# Storage statistics
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/stats
 
