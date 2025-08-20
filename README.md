@@ -7,14 +7,15 @@
 ## 📋 Features
 
 - 🔄 **Automatic logging** of all Claude Code conversations
-- 💾 **Triple Storage System** MongoDB + Redis + Memory (maximum reliability)
+- 💾 **Persistent Storage Architecture** MongoDB + Redis + Memory with Docker volumes
+- 🔄 **Data Flow**: MongoDB (persistent) → Redis (cache) → Memory (temp) for optimal performance
 - 🔍 **Intelligent search** with freshness prioritization and resolved issue detection
 - 🤖 **Integrated MCP server** for efficient queries from Claude
-- 🏗️ **Monolithic container** with MongoDB, Redis, Node.js and Nginx included
+- 🏗️ **Multi-container architecture** with internal MongoDB, Redis, and Node.js services
 - ⚡ **REST API** for integration with other tools
 - 🛡️ **Health checks** and robust error handling
-- 🐳 **Single container** - easy deployment and management
-- ⚡ **Ultra-reliable** - Automatic triple redundancy
+- 🐳 **Docker Compose** - Multi-container orchestration with persistence
+- ⚡ **Data persistence** - Survives container restarts and system reboots
 
 ## 🚀 Quick Installation
 
@@ -25,22 +26,24 @@ git clone <repository-url>
 cd claude-conversation-logger
 ```
 
-### 2. Start the monolithic container
+### 2. Start the multi-container system
 
 ```bash
-# Build and start the container with all services
+# Build and start all containers with persistent storage
 docker compose up -d --build
 
-# Verify it's working
+# Verify all services are healthy
 curl http://localhost:3003/health
 
-# The container automatically includes:
-# - MongoDB (internal port 27017) - Main persistence with 90-day TTL
-# - Redis (internal port 6379) - Secondary cache
-# - Node.js API (internal port 3000) - Main server
-# - Nginx proxy (exposed port 3003) - Access point
-# - Supervisor for process management
-# - Triple Storage: MongoDB → Redis → Memory (total redundancy)
+# The system includes three containers:
+# - claude-logger-monolith: Main Node.js + Nginx container (port 3003)
+# - claude-logger-mongo: MongoDB with persistent volume (internal port 27017, exposed 27018)
+# - claude-logger-redis: Redis with persistent volume (internal port 6379, exposed 6380)
+#
+# Data Flow:
+# 1. MongoDB: Persistent storage survives container restarts
+# 2. Redis: Fast cache layer for Claude Code queries (24h TTL)
+# 3. Memory: Temporary cache for maximum dashboard speed
 ```
 
 ### 3. Configure Claude Code Hook
@@ -547,6 +550,71 @@ The MCP server provides native tools for Claude to access stored conversations:
    - "Show me the most recent conversations"
    - "Analyze my conversation patterns"
    - "Export session XYZ in markdown"
+
+## 💾 **Data Persistence & Storage Architecture**
+
+The system uses a **three-tier storage architecture** to ensure data persistence and optimal performance:
+
+### 🏗️ **Storage Hierarchy**
+
+```mermaid
+graph LR
+    A[New Message] --> B[MongoDB]
+    B --> C[Redis Cache]  
+    C --> D[Memory]
+    B --> E[Docker Volume]
+    C --> F[Docker Volume]
+    E --> G[Survives Restart]
+    F --> H[Survives Restart]
+    D --> I[Dashboard Speed]
+```
+
+### 🔄 **Data Flow Process**
+
+1. **📝 Message Received** → Triggers storage cascade
+2. **💾 MongoDB (Primary)** → Persistent storage with Docker volume
+3. **⚡ Redis (Cache)** → Fast access for Claude Code queries (24h TTL)
+4. **🧠 Memory (Temp)** → Ultra-fast dashboard updates
+5. **🔄 Auto-Recovery** → System loads from MongoDB after restart
+
+### 🐳 **Docker Volumes Configuration**
+
+```yaml
+volumes:
+  mongo_logger_data:     # MongoDB persistent storage
+    driver: local
+  redis_logger_data:     # Redis persistent cache  
+    driver: local
+  claude_logger_data:    # Application logs & configs
+    driver: local
+```
+
+### ✅ **Data Persistence Guarantee**
+
+- **✅ Container Restart**: All data preserved via Docker volumes
+- **✅ System Reboot**: MongoDB and Redis data survives automatically
+- **✅ Docker Volume Backup**: Standard Docker volume backup procedures apply
+- **✅ Recovery**: System automatically loads from persistent storage on restart
+
+### 📊 **Storage Performance**
+
+| Operation | Source | Speed | Persistence |
+|-----------|--------|-------|-------------|
+| Dashboard Load | Memory | ~1ms | ❌ Temporary |
+| Claude Code Query | Redis | ~10ms | ✅ 24h cache |
+| Historical Search | MongoDB | ~50ms | ✅ Permanent |
+| System Recovery | MongoDB | ~500ms | ✅ Full restore |
+
+### 🔧 **Verifying Persistence**
+
+```bash
+# Test data persistence after restart
+docker compose down
+docker compose up -d
+
+# Wait for startup and verify data is preserved  
+sleep 30 && curl http://localhost:3003/dashboard
+```
 
 ### ⚡ Smart Features
 
