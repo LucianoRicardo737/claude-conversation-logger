@@ -190,43 +190,43 @@ Here's a real example of what gets stored in MongoDB when the hooks are working 
 ```javascript
 // Session initialization
 {
-  _id: '77f04828-71ad-4033-8078-e184f86df1ea',
-  session_id: '97e025af-1920-4734-b1dc-2abe06a41230',
-  project_name: 'uniCommerce',
+  _id: '2d8f3a92-4b51-4e8a-9c3d-f5e6d7a8b9c0',
+  session_id: 'a4b5c6d7-8e9f-4a5b-9c8d-7e6f5a4b3c2d',
+  project_name: 'claude-conversation-logger',
   message_type: 'system',
   content: 'Session started (source: startup)',
   hook_event: 'SessionStart',
-  timestamp: ISODate('2025-08-20T11:44:38.349Z')
+  timestamp: ISODate('2025-01-20T14:32:15.742Z')
 }
 
 // User message captured
 {
-  _id: 'e6c10e47-de16-49f8-9aaa-56e7249da2c3',
-  session_id: '97e025af-1920-4734-b1dc-2abe06a41230',
-  project_name: 'uniCommerce',
+  _id: 'f3e4d5c6-b7a8-4f3e-8d9c-2b1a0f9e8d7c',
+  session_id: 'a4b5c6d7-8e9f-4a5b-9c8d-7e6f5a4b3c2d',
+  project_name: 'claude-conversation-logger',
   message_type: 'user',
-  content: 'Hola, probando, 1 2 3',
+  content: 'Necesito revisar el README completo y ajustarlo porque hay partes que aun muestran la memoria temporal',
   hook_event: 'UserPromptSubmit',
-  timestamp: ISODate('2025-08-20T11:44:42.388Z')
+  timestamp: ISODate('2025-01-20T14:32:18.156Z')
 }
 
 // Assistant response with complete token usage
 {
-  _id: '0b5e0ff9-598c-46eb-b2d1-17f4b83e26dd',
-  session_id: '97e025af-1920-4734-b1dc-2abe06a41230',
-  project_name: 'uniCommerce',
+  _id: '8c9b0a1f-2e3d-4c5b-a6f9-8e7d6c5b4a39',
+  session_id: 'a4b5c6d7-8e9f-4a5b-9c8d-7e6f5a4b3c2d',
+  project_name: 'claude-conversation-logger',
   message_type: 'assistant',
-  content: 'Hola! Te recibo perfectamente. ¿En qué puedo ayudarte hoy con el proyecto uniCommerce?',
+  content: 'Revisaré el README completo para eliminar todas las referencias obsoletas a características que ya no existen. Comenzaré identificando menciones a "memory buffer", "Triple Storage System" y otros elementos de la arquitectura anterior.',
   hook_event: 'Stop',
-  timestamp: ISODate('2025-08-20T11:44:47.757Z'),
+  timestamp: ISODate('2025-01-20T14:32:23.891Z'),
   metadata: {
     source: 'stop_hook_assistant',
-    model: 'claude-opus-4-1-20250805',
+    model: 'claude-sonnet-4-20250514',
     usage: {
-      input_tokens: 3,
-      cache_creation_input_tokens: 44348,  // Created once per session
-      cache_read_input_tokens: 0,           // Will be used in subsequent turns
-      output_tokens: 8,                     // Includes internal processing overhead
+      input_tokens: 47,
+      cache_creation_input_tokens: 52847,  // Created once per session
+      cache_read_input_tokens: 0,          // Will be used in subsequent turns
+      output_tokens: 38,                   // Realistic response length
       service_tier: 'standard'
     }
   }
@@ -350,7 +350,7 @@ Each assistant response generates separate records for:
   metadata: {
     token_type: 'output',           // OpenTelemetry compliant
     token_count: 125,               // Exact count for this type
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-4-20250514',
     cost_usd: 0.001875,            // Estimated cost
     duration_ms: 1500,             // Response time
     source: 'opentelemetry_token_tracking'
