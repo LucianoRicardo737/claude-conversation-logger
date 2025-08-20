@@ -1,6 +1,6 @@
 # Claude Conversation Logger
 
-🔍 **Complete conversation logging system for Claude Code** with a monolithic container that includes everything needed.
+🔍 **Complete conversation logging system for Claude Code** with a single monolithic container that includes everything needed.
 
 > **⚡ Quick Start**: [QUICK_START.md](./QUICK_START.md) | **🏗️ Estructura**: [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | **🤖 Ejemplos MCP**: [examples/mcp-usage-examples.md](./examples/mcp-usage-examples.md)
 
@@ -11,10 +11,10 @@
 - 🔄 **Data Flow**: MongoDB (persistent) → Redis (high-availability cache) for optimal performance
 - 🔍 **Intelligent search** with freshness prioritization and resolved issue detection
 - 🤖 **Integrated MCP server** for efficient queries from Claude
-- 🏗️ **Multi-container architecture** with internal MongoDB, Redis, and Node.js services
+- 🏗️ **Monolithic architecture** with integrated MongoDB, Redis, Node.js and Nginx
 - ⚡ **REST API** for integration with other tools
 - 🛡️ **Health checks** and robust error handling
-- 🐳 **Docker Compose** - Multi-container orchestration with persistence
+- 🐳 **Single container** - Simple deployment with all services integrated
 - ⚡ **Data persistence** - Survives container restarts and system reboots
 
 ## 🚀 Quick Installation
@@ -26,24 +26,26 @@ git clone <repository-url>
 cd claude-conversation-logger
 ```
 
-### 2. Start the multi-container system
+### 2. Start the monolithic container
 
 ```bash
-# Build and start all containers with persistent storage
+# Build and start single container with all services integrated
 docker compose up -d --build
 
-# Verify all services are healthy
+# Verify the system is healthy
 curl http://localhost:3003/health
 
-# The system includes three containers:
-# - claude-logger-monolith: Main Node.js + Nginx container (port 3003)
-# - claude-logger-mongo: MongoDB with persistent volume (internal port 27017, exposed 27018)
-# - claude-logger-redis: Redis with persistent volume (internal port 6379, exposed 6380)
+# The system includes one container with all services:
+# - MongoDB 7.0: Internal database (port 27017)
+# - Redis 7: Internal cache (port 6379) 
+# - Node.js 18: API server (internal port 3000)
+# - Nginx: Reverse proxy (exposed port 3003)
+# - Supervisor: Process manager for all services
 #
 # Data Flow:
-# 1. MongoDB: Persistent storage survives container restarts
+# 1. MongoDB: Persistent storage with Docker volume
 # 2. Redis: High-availability cache for MCP queries (5000 msgs, 24h TTL)
-# Dashboard reads directly from MongoDB (no memory cache needed)
+# 3. All services communicate internally via localhost
 ```
 
 ### 3. Configure Claude Code Hook
@@ -553,57 +555,56 @@ The MCP server provides native tools for Claude to access stored conversations:
 
 ## 💾 **Data Persistence & Storage Architecture**
 
-The system uses a **three-tier storage architecture** to ensure data persistence and optimal performance:
+The system uses a **two-tier storage architecture** within a single container to ensure data persistence and optimal performance:
 
 ### 🏗️ **Storage Hierarchy**
 
 ```mermaid
 graph LR
-    A[New Message] --> B[MongoDB]
-    B --> C[Redis Cache]  
-    C --> D[Memory]
+    A[New Message] --> B[MongoDB Internal]
+    B --> C[Redis Internal]  
     B --> E[Docker Volume]
-    C --> F[Docker Volume]
+    C --> D[MCP Queries]
+    B --> F[Dashboard Direct]
     E --> G[Survives Restart]
-    F --> H[Survives Restart]
-    D --> I[Dashboard Speed]
+    
+    style B fill:#4caf50,stroke:#2e7d32
+    style C fill:#2196f3,stroke:#1565c0
+    style E fill:#ff9800,stroke:#ef6c00
 ```
 
 ### 🔄 **Data Flow Process**
 
-1. **📝 Message Received** → Triggers optimized storage flow
-2. **💾 MongoDB (Primary)** → Persistent storage with Docker volume
-3. **⚡ Redis (High-Availability Cache)** → 5000 messages for MCP queries (24h TTL)
-4. **📊 Dashboard** → Reads directly from MongoDB (acceptable ~50ms response)
-5. **🔄 Auto-Recovery** → System loads from MongoDB after restart
+1. **📝 Message Received** → Triggers optimized storage flow in single container
+2. **💾 MongoDB Internal** → Persistent storage with Docker volume (localhost:27017)
+3. **⚡ Redis Internal** → 5000 messages cache for MCP queries (localhost:6379, 24h TTL)
+4. **📊 Dashboard** → Reads directly from internal MongoDB (~50ms response)
+5. **🔄 Auto-Recovery** → All services restart together via Supervisor
 
 ### 🐳 **Docker Volumes Configuration**
 
 ```yaml
 volumes:
-  mongo_logger_data:     # MongoDB persistent storage
+  claude_logger_data:    # Single volume for all persistent data
     driver: local
-  redis_logger_data:     # Redis persistent cache  
-    driver: local
-  claude_logger_data:    # Application logs & configs
-    driver: local
+    # Contains: MongoDB data + Redis data + Application logs
 ```
 
 ### ✅ **Data Persistence Guarantee**
 
-- **✅ Container Restart**: All data preserved via Docker volumes
-- **✅ System Reboot**: MongoDB and Redis data survives automatically
+- **✅ Container Restart**: All data preserved via single Docker volume
+- **✅ System Reboot**: MongoDB and Redis data survives automatically within container
 - **✅ Docker Volume Backup**: Standard Docker volume backup procedures apply
-- **✅ Recovery**: System automatically loads from persistent storage on restart
+- **✅ Recovery**: Supervisor restarts all services and loads from persistent storage
 
 ### 📊 **Storage Performance**
 
 | Operation | Source | Speed | Persistence |
 |-----------|--------|-------|-------------|
-| MCP Claude Code Query | Redis | ~10ms | ✅ 24h cache (5000 msgs) |
-| Dashboard Load | MongoDB | ~50ms | ✅ Permanent |
-| Historical Search | MongoDB | ~50ms | ✅ Permanent |
-| System Recovery | MongoDB | ~500ms | ✅ Full restore |
+| MCP Claude Code Query | Redis Internal | ~10ms | ✅ 24h cache (5000 msgs) |
+| Dashboard Load | MongoDB Internal | ~50ms | ✅ Permanent |
+| Historical Search | MongoDB Internal | ~50ms | ✅ Permanent |
+| System Recovery | Supervisor + MongoDB | ~500ms | ✅ Full restore |
 
 ### 🔧 **Verifying Persistence**
 

@@ -13,13 +13,8 @@ services:
     environment:
       - NODE_ENV=production
       - API_SECRET=claude_api_secret_2024_change_me
-      - MONGODB_URI=mongodb://admin:claude_logger_2024@mongo-logger:27017/conversations?authSource=admin
-      - REDIS_URL=redis://redis-logger:6379
-    depends_on:
-      - mongo-logger
-      - redis-logger
-    networks:
-      - claude-logger-network
+      - MONGODB_URI=mongodb://admin:claude_logger_2024@localhost:27017/conversations?authSource=admin
+      - REDIS_URL=redis://localhost:6379
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
       interval: 30s
@@ -27,52 +22,6 @@ services:
       retries: 3
       start_period: 90s
 
-  mongo-logger:
-    image: mongo:7
-    container_name: claude-logger-mongo
-    restart: unless-stopped
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=claude_logger_2024
-      - MONGO_INITDB_DATABASE=conversations
-    volumes:
-      - mongo_logger_data:/data/db
-    ports:
-      - "27018:27017"
-    networks:
-      - claude-logger-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-
-  redis-logger:
-    image: redis:7-alpine
-    container_name: claude-logger-redis
-    restart: unless-stopped
-    volumes:
-      - redis_logger_data:/data
-    ports:
-      - "6380:6379"
-    networks:
-      - claude-logger-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
 volumes:
   claude_logger_data:
     driver: local
-  mongo_logger_data:
-    driver: local
-  redis_logger_data:
-    driver: local
-
-networks:
-  claude-logger-network:
-    driver: bridge
