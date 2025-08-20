@@ -2,6 +2,30 @@
 
 All notable changes to the Claude Conversation Logger project will be documented in this file.
 
+## [2.1.3] - 2025-08-20
+
+### 📊 Added - Visual Dashboard
+- **NEW Endpoint**: `/dashboard` serves complete HTML dashboard with real-time statistics
+- **Interactive Charts**: Token distribution (donut chart) and project activity (bar chart)
+- **Key Metrics Cards**: Total messages, cost tracking, token consumption, active projects
+- **Model Usage Table**: Per-model statistics with detailed cost breakdown
+- **Auto-Refresh**: Dashboard updates automatically every 30 seconds
+- **Responsive Design**: TailwindCSS-based mobile-first responsive layout
+- **Real-Time Data**: Live statistics from current conversation logs
+- **Chart.js Integration**: Interactive, animated charts for better data visualization
+
+### 🎨 Dashboard Features
+- **TailwindCSS**: Modern, responsive styling via CDN
+- **Chart.js**: Interactive donut and bar charts via CDN
+- **No Authentication**: Public endpoint for easy access
+- **Error Handling**: Graceful fallback if data unavailable
+- **Mobile Optimized**: Works perfectly on all device sizes
+
+### 📚 Documentation Updates
+- **README**: Added comprehensive dashboard documentation with examples
+- **Endpoint Table**: Updated to include new `/dashboard` endpoint
+- **Visual Layout**: Added ASCII art representation of dashboard structure
+
 ## [2.1.2] - 2025-08-20
 
 ### 🔧 Fixed - Critical Token Counting Bug

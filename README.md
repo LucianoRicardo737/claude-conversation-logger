@@ -300,6 +300,7 @@ REDIS_URL=redis://localhost:6379
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | System health check |
+| **`/dashboard`** | **GET** | **📊 NEW: Visual HTML dashboard with real-time stats** |
 | `/api/log` | POST | Save conversation message |
 | `/api/token-usage` | POST | **NEW**: Save OpenTelemetry token metrics |
 | `/api/messages` | GET | Get recent messages |
@@ -385,6 +386,95 @@ curl -H "X-API-Key: claude_api_secret_2024_change_me" \
   }
 }
 ```
+
+## 📊 **Visual Dashboard**
+
+The system now includes a **comprehensive HTML dashboard** with real-time statistics and interactive charts.
+
+### 🚀 **Accessing the Dashboard**
+
+```bash
+# Open the dashboard in your browser
+http://localhost:3003/dashboard
+
+# Or via curl to check status
+curl -I http://localhost:3003/dashboard
+```
+
+### 🎯 **Dashboard Features**
+
+#### **📈 Key Metrics Cards**
+- **Total Messages**: Complete conversation count
+- **Total Cost**: Real-time cost tracking with USD precision
+- **Total Tokens**: Aggregated token consumption across all types
+- **Active Projects**: Multi-tenant project tracking
+
+#### **📊 Interactive Charts**
+- **Token Distribution (Donut Chart)**: OpenTelemetry-compliant breakdown
+  - Input tokens (user prompts)
+  - Output tokens (assistant responses) 
+  - Cache Read tokens (90% discount reuse)
+  - Cache Creation tokens (first-time context)
+  
+- **Project Activity (Bar Chart)**: Message distribution across projects
+  - Real-time activity tracking
+  - Percentage-based progress bars
+
+#### **🤖 Model Usage Table**
+- **Per-Model Statistics**: Token usage and costs by Claude model
+- **Request Tracking**: Number of requests per model
+- **Cost Breakdown**: Detailed USD costs with 4-decimal precision
+
+### 🎨 **Design & Technology**
+
+- **🎨 TailwindCSS**: Modern, responsive design via CDN
+- **📈 Chart.js**: Interactive, animated charts via CDN
+- **🔄 Auto-Refresh**: Updates every 30 seconds automatically
+- **📱 Responsive**: Mobile-first design that works on all devices
+- **⚡ Real-Time**: Live data from current conversation logs
+
+### 🖥️ **Dashboard Layout**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  📊 Claude Conversation Logger v2.1.2                  │
+├─────────────────┬─────────────────┬─────────────────────┤
+│  💬 Messages    │  💰 Cost       │  🎯 Tokens         │
+│      352        │    $2.65       │      1.08M          │
+├─────────────────┴─────────────────┴─────────────────────┤
+│  📈 Token Distribution (Interactive Donut Chart)       │
+│    • Cache Read: 822k tokens (76%)                     │
+│    • Cache Creation: 258k tokens (24%)                 │
+│    • Output: 329 tokens (0.03%)                       │
+│    • Input: 86 tokens (0.008%)                        │
+├─────────────────────────────────────────────────────────┤
+│  🏗️ Project Activity (Interactive Bar Chart)           │
+│    • uniCommerce: ████████████████████ 287 msgs       │
+│    • claude-conversation-logger: ████ 65 msgs         │
+├─────────────────────────────────────────────────────────┤
+│  🤖 Model Usage & Cost Analysis                        │
+│    ┌─────────────────────────────────────────────────┐ │
+│    │ Model              │ Tokens  │ Requests │ Cost  │ │
+│    │ Claude Sonnet 4    │ 1.07M   │    32    │$2.65  │ │
+│    │ Claude 3.5 Sonnet  │  3.8k   │     6    │$0.006 │ │
+│    └─────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### ⚡ **Performance & Updates**
+
+- **🔄 Auto-Refresh**: Page refreshes every 30 seconds
+- **📊 Real-Time Data**: Always shows current statistics
+- **🚀 Fast Loading**: Single HTML page with CDN assets
+- **💾 No Database**: Uses in-memory statistics for speed
+- **📱 Mobile Optimized**: Responsive grid layout
+
+### 🛡️ **Security & Access**
+
+- **🌐 Public Endpoint**: No authentication required for dashboard
+- **🔒 Read-Only**: Dashboard only displays data, cannot modify
+- **🎯 Safe Data**: Only shows aggregated statistics, no sensitive content
+- **🏥 Error Handling**: Graceful fallback if data unavailable
 
 ## 🤖 Integrated MCP Server
 
