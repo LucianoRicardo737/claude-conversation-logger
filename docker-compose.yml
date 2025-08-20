@@ -1,0 +1,25 @@
+services:
+  claude-logger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-logger-monolith
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    volumes:
+      - claude_logger_data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - API_SECRET=claude_api_secret_2024_change_me
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+volumes:
+  claude_logger_data:
+    driver: local

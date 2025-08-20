@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "conversation-logger": {
+      "command": "node",
+      "args": ["/home/uni/Escritorio/unicorp/unicorp/uniCommerce/claude-conversation-logger/src/mcp-server.js"],
+      "env": {
+        "API_URL": "http://localhost:3003",
+        "API_KEY": "claude_api_secret_2024_change_me"
+      }
+    }
+  }
+}
