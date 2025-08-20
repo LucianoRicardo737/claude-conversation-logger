@@ -264,6 +264,11 @@ REDIS_URL=redis://localhost:6379
 # MONGODB_TTL_SECONDS=2592000   # 30 days (2592000 seconds)  
 # MONGODB_TTL_SECONDS=604800    # 7 days (604800 seconds)
 # If not set, conversations persist indefinitely
+
+# Optional Redis Cache Configuration (uncomment to customize)
+# REDIS_MESSAGE_LIMIT=5000      # 5000 messages (default)
+# REDIS_MESSAGE_LIMIT=10000     # 10000 messages (more cache)
+# REDIS_MESSAGE_LIMIT=1000      # 1000 messages (less memory)
 ```
 
 ## 🏗️ Monolithic Architecture
@@ -809,9 +814,10 @@ docker compose up -d --build
 ### 💾 **Storage System**
 
 - **🗄️ MongoDB**: Main persistence (indefinite by default, configurable TTL)
-- **🚀 Redis**: Fast cache for frequent queries  
+- **🚀 Redis**: Fast cache for frequent queries (5000 messages by default, configurable)
 - **🔄 Auto-failover**: MongoDB → Redis (redundancy)
-- **⚙️ Configurable TTL**: Optional MONGODB_TTL_SECONDS environment variable
+- **⚙️ Configurable TTL**: Optional MONGODB_TTL_SECONDS environment variable  
+- **📊 Configurable Cache**: Optional REDIS_MESSAGE_LIMIT environment variable
 - **🧹 Auto-cleanup**: Automatic cleanup at all levels
 - **📊 Smart routing**: Read from MongoDB, cache in Redis
 
@@ -836,13 +842,24 @@ docker compose down && docker compose up -d
 ```
 
 #### **Redis Cache Configuration**
-```javascript
-// Configure Redis settings  
-const REDIS_SYNC_INTERVAL = 5000;  // ms for sync
+```bash
+# Default: 5000 messages in Redis cache (recommended)
+# No environment variable needed
 
-// Redis TTL for individual messages (24 hours)
-const REDIS_MESSAGE_TTL = 86400;  // seconds
+# Optional: Customize cache size based on memory constraints
+export REDIS_MESSAGE_LIMIT=5000   # Default (balanced performance/memory)
+export REDIS_MESSAGE_LIMIT=10000  # High performance (more memory usage)
+export REDIS_MESSAGE_LIMIT=1000   # Low memory (reduced performance)
+
+# Restart container to apply changes  
+docker compose down && docker compose up -d
 ```
+
+**Redis Cache Guidelines:**
+- **5000 messages**: Optimal balance (default)
+- **10000 messages**: High-performance setup (~20MB extra memory)
+- **1000 messages**: Memory-constrained environments
+- **Individual message TTL**: 24 hours (hardcoded for efficiency)
 
 ### Customize Logging Hook
 

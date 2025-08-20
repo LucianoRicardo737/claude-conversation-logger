@@ -18,6 +18,10 @@ services:
       # Optional: Set TTL for automatic data expiration (in seconds)
       # - MONGODB_TTL_SECONDS=7776000  # 90 days (uncomment to enable)
       # By default, data persists indefinitely
+      # Optional: Set Redis message limit (default: 5000)  
+      # - REDIS_MESSAGE_LIMIT=5000     # 5000 messages (default)
+      # - REDIS_MESSAGE_LIMIT=10000    # 10000 messages (more cache)
+      # - REDIS_MESSAGE_LIMIT=1000     # 1000 messages (less memory)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
       interval: 30s

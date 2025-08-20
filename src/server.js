@@ -10,6 +10,9 @@ import { v4 as uuidv4 } from 'uuid';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuration constants
+const REDIS_MESSAGE_LIMIT = parseInt(process.env.REDIS_MESSAGE_LIMIT) || 5000;
+
 // Redis connection
 const redisClient = Redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379'
@@ -106,7 +109,7 @@ async function saveMessage(data) {
     return await saveToStorage(message);
 }
 
-// Helper function to save with optimized flow: MongoDB → Redis (5000 msgs for MCP)
+// Helper function to save with optimized flow: MongoDB → Redis (configurable limit for MCP)
 async function saveToStorage(record) {
     let mongoSaveSuccess = false;
     
@@ -121,7 +124,7 @@ async function saveToStorage(record) {
         console.warn('❌ MongoDB save failed:', error.message);
     }
 
-    // 2. SECOND: Update Redis cache for high-availability MCP queries (5000 msgs)
+    // 2. SECOND: Update Redis cache for high-availability MCP queries (configurable limit)
     try {
         if (redisClient.isOpen) {
             const recordForCache = {
@@ -133,9 +136,9 @@ async function saveToStorage(record) {
             // Save individual message
             await redisClient.setEx(`msg:${record.id}`, 86400, JSON.stringify(recordForCache)); // 24h TTL
             
-            // Update recent messages list for fast MCP queries (increased capacity)
+            // Update recent messages list for fast MCP queries (configurable capacity)
             await redisClient.lPush('messages:recent', JSON.stringify(recordForCache));
-            await redisClient.lTrim('messages:recent', 0, 4999); // Keep last 5000 messages
+            await redisClient.lTrim('messages:recent', 0, REDIS_MESSAGE_LIMIT - 1); // Keep last N messages
             
             // Invalidate dashboard cache to force refresh
             await redisClient.del('dashboard:stats');
@@ -1236,7 +1239,7 @@ async function startServer() {
             }
         }
         if (redisConnected) {
-            console.log('🔄 Redis: Secondary backup active');
+            console.log(`🔄 Redis: Secondary backup active (${REDIS_MESSAGE_LIMIT} message limit)`);
         }
         console.log('⚡ System: Ready for conversation logging');
     });
