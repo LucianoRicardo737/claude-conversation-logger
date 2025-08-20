@@ -13,7 +13,7 @@ docker compose up -d --build
 # Verify it works (should show "healthy")
 curl http://localhost:3003/health
 
-# ✅ System ready: Triple Storage System (MongoDB + Redis + Memory)
+# ✅ System ready: Dual Storage System (MongoDB + Redis)
 ```
 
 ## 2. Configure Hook (1 minute)

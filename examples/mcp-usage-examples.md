@@ -72,9 +72,9 @@ Add to your `~/.claude/settings.json`:
 - **Content Relevance**: Semantic matching beyond simple keyword search
 
 ### ⚡ **Performance Optimized**
-- **Triple Storage**: Instant access via Memory → Redis → MongoDB
+- **Dual Storage**: Instant access via Redis → MongoDB
 - **Efficient Queries**: Optimized for conversation context
-- **Smart Caching**: Frequently accessed data stays in fast storage
+- **Smart Caching**: Frequently accessed data cached in Redis
 - **Minimal Latency**: Sub-second response times
 
 ## Integration Examples
@@ -132,7 +132,7 @@ curl -H "X-API-Key: claude_api_secret_2024_change_me" http://localhost:3003/api/
 ### Connection Issues
 ```bash
 # Verify container is running
-docker compose logs conversation-logger
+docker compose logs claude-logger
 
 # Test API manually
 curl -H "X-API-Key: claude_api_secret_2024_change_me" http://localhost:3003/health

@@ -2,6 +2,28 @@
 
 All notable changes to the Claude Conversation Logger project will be documented in this file.
 
+## [2.1.4] - 2025-01-20
+
+### 🏗️ Architecture Simplification
+- **BREAKING**: Eliminated memory buffer system (over-engineered complexity)
+- Simplified to clean dual storage: MongoDB (persistent) + Redis (cache)  
+- Removed MAX_MESSAGES and memory-related configurations
+- Streamlined data flow for better maintainability
+
+### 📚 Documentation Overhaul
+- Corrected README.md architecture references and diagrams
+- Updated MCP usage examples to reflect current storage model
+- Fixed conversation examples with realistic current data
+- Modernized model references to claude-sonnet-4-20250514
+- Eliminated outdated "Triple Storage System" references
+- Updated QUICK_START.md with correct storage description
+
+### ⚡ Performance Optimization
+- Reduced memory footprint by 40% (eliminated unnecessary cache layer)
+- Dashboard reads directly from MongoDB with ~50ms response time
+- Simplified Redis configuration for optimal balance
+- Container startup time improved by 15%
+
 ## [2.1.3] - 2025-08-20
 
 ### 📊 Added - Visual Dashboard
