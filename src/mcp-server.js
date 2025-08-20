@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * MCP Server para Claude Conversation Logger
- * Proporciona herramientas nativas para Claude Code para consultar conversaciones
+ * MCP Server for Claude Conversation Logger
+ * Provides native tools for Claude Code to query conversations
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -16,7 +16,7 @@ const API_URL = process.env.API_URL || 'http://localhost:3003';
 const API_KEY = process.env.API_KEY || 'claude_api_secret_2024_change_me';
 
 /**
- * Realizar petición a la API
+ * Make API request
  */
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_URL}/api/${endpoint}`;
@@ -37,14 +37,14 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 /**
- * Calcular score de frescura para priorizar conversaciones recientes
+ * Calculate freshness score to prioritize recent conversations
  */
 function calculateFreshnessScore(timestamp) {
   const now = Date.now();
   const messageTime = new Date(timestamp).getTime();
   const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
   
-  // Score más alto para mensajes más recientes
+  // Higher score for more recent messages
   if (hoursDiff < 1) return 100;
   if (hoursDiff < 24) return 90;
   if (hoursDiff < 168) return 70; // 1 semana
@@ -53,7 +53,7 @@ function calculateFreshnessScore(timestamp) {
 }
 
 /**
- * Detectar si una conversación está resuelta
+ * Detect if a conversation is resolved
  */
 function isResolved(messages) {
   const resolvedKeywords = [
@@ -88,27 +88,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "search_conversations",
-        description: "Buscar en el historial de conversaciones con priorización por frescura",
+        description: "Search conversation history with freshness prioritization",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Términos de búsqueda"
+              description: "Search terms"
             },
             days: {
               type: "number",
-              description: "Limitar búsqueda a los últimos N días (default: 7)",
+              description: "Limit search to last N days (default: 7)",
               default: 7
             },
             include_resolved: {
               type: "boolean",
-              description: "Incluir conversaciones ya resueltas (default: false)",
+              description: "Include already resolved conversations (default: false)",
               default: false
             },
             limit: {
               type: "number",
-              description: "Número máximo de resultados (default: 10)",
+              description: "Maximum number of results (default: 10)",
               default: 10
             }
           },
@@ -117,22 +117,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get_recent_conversations",
-        description: "Obtener conversaciones recientes priorizadas por frescura",
+        description: "Get recent conversations prioritized by freshness",
         inputSchema: {
           type: "object",
           properties: {
             hours: {
               type: "number",
-              description: "Horas hacia atrás (default: 24)",
+              description: "Hours back (default: 24)",
               default: 24
             },
             project: {
               type: "string",
-              description: "Filtrar por proyecto específico (opcional)"
+              description: "Filter by specific project (optional)"
             },
             limit: {
               type: "number",
-              description: "Número máximo de conversaciones (default: 5)",
+              description: "Maximum number of conversations (default: 5)",
               default: 5
             }
           }
@@ -140,31 +140,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "analyze_conversation_patterns",
-        description: "Analizar patrones en las conversaciones para identificar temas recurrentes",
+        description: "Analyze conversation patterns to identify recurring themes",
         inputSchema: {
           type: "object",
           properties: {
             days: {
               type: "number", 
-              description: "Analizar últimos N días (default: 7)",
+              description: "Analyze last N days (default: 7)",
               default: 7
             },
             project: {
               type: "string",
-              description: "Filtrar por proyecto (opcional)"
+              description: "Filter by project (optional)"
             }
           }
         }
       },
       {
         name: "export_conversation",
-        description: "Exportar una conversación completa en formato Markdown",
+        description: "Export a complete conversation in Markdown format",
         inputSchema: {
           type: "object",
           properties: {
             session_id: {
               type: "string",
-              description: "ID de la sesión a exportar"
+              description: "Session ID to export"
             }
           },
           required: ["session_id"]
@@ -181,23 +181,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         const { query, days = 7, include_resolved = false, limit = 10 } = request.params.arguments;
         
-        // Buscar en la API
+        // Search in API
         const searchParams = new URLSearchParams({
           q: query,
           days: days.toString(),
-          limit: (limit * 2).toString() // Obtener más para filtrar
+          limit: (limit * 2).toString() // Get more to filter
         });
 
         const results = await apiRequest(`search?${searchParams}`);
         
-        // Filtrar y priorizar resultados
+        // Filter and prioritize results
         let filteredResults = results.messages || [];
         
         if (!include_resolved) {
           filteredResults = filteredResults.filter(msg => !isResolved([msg]));
         }
         
-        // Agregar score de frescura y ordenar
+        // Add freshness score and sort
         filteredResults = filteredResults
           .map(msg => ({
             ...msg,
@@ -210,7 +210,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: `🔍 Encontradas ${filteredResults.length} conversaciones para "${query}":\n\n` +
+              text: `🔍 Found ${filteredResults.length} conversations for "${query}":\n\n` +
                 filteredResults.map((msg, i) => 
                   `${i + 1}. **${msg.project_name}** (${new Date(msg.created_at || msg.timestamp).toLocaleString()})\n` +
                   `   Score: ${msg.freshness_score}/100\n` +
@@ -223,7 +223,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `❌ Error buscando conversaciones: ${error.message}`
+            text: `❌ Error searching conversations: ${error.message}`
           }]
         };
       }
@@ -241,7 +241,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const results = await apiRequest(`messages?${params}`);
         const messages = results.messages || [];
         
-        // Filtrar por tiempo y calcular frescura
+        // Filter by time and calculate freshness
         const cutoffTime = Date.now() - (hours * 60 * 60 * 1000);
         const recentMessages = messages
           .filter(msg => {
@@ -257,20 +257,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `📅 Conversaciones recientes (últimas ${hours}h):\n\n` +
+            text: `📅 Recent conversations (last ${hours}h):\n\n` +
               recentMessages.map((msg, i) =>
                 `${i + 1}. **${msg.project_name}** - ${msg.session_id}\n` +
                 `   ${new Date(msg.created_at || msg.timestamp).toLocaleString()}\n` +
                 `   ${msg.content.substring(0, 200)}...\n`
               ).join('\n') +
-              (recentMessages.length === 0 ? 'No hay conversaciones recientes.' : '')
+              (recentMessages.length === 0 ? 'No recent conversations.' : '')
           }]
         };
       } catch (error) {
         return {
           content: [{
             type: "text", 
-            text: `❌ Error obteniendo conversaciones recientes: ${error.message}`
+            text: `❌ Error getting recent conversations: ${error.message}`
           }]
         };
       }
@@ -289,27 +289,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const results = await apiRequest(`messages?${params}`);
         const messages = results.messages || [];
         
-        // Análisis de patrones
+        // Pattern analysis
         const projectCounts = {};
         const sessionCounts = {};
         const hourlyActivity = Array(24).fill(0);
         const keywords = {};
         
         messages.forEach(msg => {
-          // Conteo por proyecto
+          // Count by project
           projectCounts[msg.project_name] = (projectCounts[msg.project_name] || 0) + 1;
           
-          // Conteo por sesión
+          // Count by session
           sessionCounts[msg.session_id] = (sessionCounts[msg.session_id] || 0) + 1;
           
-          // Actividad por hora
+          // Activity by hour
           const hour = new Date(msg.created_at || msg.timestamp).getHours();
           hourlyActivity[hour]++;
           
-          // Análisis de palabras clave
+          // Keyword analysis
           const words = msg.content.toLowerCase().match(/\b[a-záéíóúñ]+\b/g) || [];
           words.forEach(word => {
-            if (word.length > 4) { // Solo palabras significativas
+            if (word.length > 4) { // Only significant words
               keywords[word] = (keywords[word] || 0) + 1;
             }
           });
@@ -331,19 +331,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `📊 Análisis de conversaciones (últimos ${days} días):\n\n` +
-              `**Proyectos más activos:**\n${topProjects.map(([proj, count]) => `• ${proj}: ${count} mensajes`).join('\n')}\n\n` +
-              `**Palabras clave frecuentes:**\n${topKeywords.map(([word, count]) => `• ${word}: ${count} veces`).join('\n')}\n\n` +
-              `**Hora más activa:** ${mostActiveHour}:00 (${hourlyActivity[mostActiveHour]} mensajes)\n\n` +
-              `**Total de sesiones únicas:** ${Object.keys(sessionCounts).length}\n` +
-              `**Total de mensajes:** ${messages.length}`
+            text: `📊 Conversation analysis (last ${days} days):\n\n` +
+              `**Most active projects:**\n${topProjects.map(([proj, count]) => `• ${proj}: ${count} messages`).join('\n')}\n\n` +
+              `**Frequent keywords:**\n${topKeywords.map(([word, count]) => `• ${word}: ${count} times`).join('\n')}\n\n` +
+              `**Most active hour:** ${mostActiveHour}:00 (${hourlyActivity[mostActiveHour]} messages)\n\n` +
+              `**Total unique sessions:** ${Object.keys(sessionCounts).length}\n` +
+              `**Total messages:** ${messages.length}`
           }]
         };
       } catch (error) {
         return {
           content: [{
             type: "text",
-            text: `❌ Error analizando patrones: ${error.message}`
+            text: `❌ Error analyzing patterns: ${error.message}`
           }]
         };
       }
@@ -354,7 +354,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         const params = new URLSearchParams({
           session: session_id,
-          limit: '1000' // Obtener toda la conversación
+          limit: '1000' // Get entire conversation
         });
 
         const results = await apiRequest(`messages?${params}`);
@@ -364,21 +364,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return {
             content: [{
               type: "text",
-              text: `❌ No se encontraron mensajes para la sesión: ${session_id}`
+              text: `❌ No messages found for session: ${session_id}`
             }]
           };
         }
         
-        // Generar Markdown
+        // Generate Markdown
         const project = messages[0]?.project_name || 'Unknown';
         const startTime = messages[0]?.created_at || messages[0]?.timestamp;
         const endTime = messages[messages.length - 1]?.created_at || messages[messages.length - 1]?.timestamp;
         
-        const markdown = `# Conversación: ${project}\n\n` +
-          `**Sesión:** ${session_id}\n` +
-          `**Inicio:** ${new Date(startTime).toLocaleString()}\n` +
-          `**Fin:** ${new Date(endTime).toLocaleString()}\n` +
-          `**Total de mensajes:** ${messages.length}\n\n` +
+        const markdown = `# Conversation: ${project}\n\n` +
+          `**Session:** ${session_id}\n` +
+          `**Start:** ${new Date(startTime).toLocaleString()}\n` +
+          `**End:** ${new Date(endTime).toLocaleString()}\n` +
+          `**Total messages:** ${messages.length}\n\n` +
           `---\n\n` +
           messages.map(msg => {
             const time = new Date(msg.created_at || msg.timestamp).toLocaleString();
@@ -389,20 +389,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `📄 Conversación exportada:\n\n\`\`\`markdown\n${markdown}\n\`\`\``
+            text: `📄 Exported conversation:\n\n\`\`\`markdown\n${markdown}\n\`\`\``
           }]
         };
       } catch (error) {
         return {
           content: [{
             type: "text",
-            text: `❌ Error exportando conversación: ${error.message}`
+            text: `❌ Error exporting conversation: ${error.message}`
           }]
         };
       }
 
     default:
-      throw new Error(`Herramienta desconocida: ${request.params.name}`);
+      throw new Error(`Unknown tool: ${request.params.name}`);
   }
 });
 
@@ -410,4 +410,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 server.connect(transport);
 
-console.error("🤖 MCP Server de Claude Conversation Logger iniciado");
+console.error("🤖 Claude Conversation Logger MCP Server started");

@@ -43,31 +43,31 @@ curl http://localhost:3003/health
 # - Triple Storage: MongoDB → Redis → Memory (total redundancy)
 ```
 
-### 3. Configurar Claude Code Hook
+### 3. Configure Claude Code Hook
 
 ```bash
-# Crear directorio de hooks si no existe
+# Create hooks directory if it doesn't exist
 mkdir -p ~/.claude/hooks
 
-# El hook ya está listo, solo copiarlo
+# The hook is ready, just copy it
 cp .claude/hooks/api-logger.py ~/.claude/hooks/api-logger.py
 chmod +x ~/.claude/hooks/api-logger.py
 
-# Probar que funciona
+# Test that it works
 ./examples/hook-test.sh
 ```
 
-### 4. Configurar settings.json de Claude Code
+### 4. Configure Claude Code settings.json
 
-Copiar la configuración de ejemplo:
+Copy the example configuration:
 
 ```bash
-# Crear configuración base
+# Create base configuration
 cp examples/claude-settings.json ~/.claude/settings.json
-# O agregar las secciones correspondientes si ya tienes settings.json
+# Or add the corresponding sections if you already have settings.json
 ```
 
-**Contenido de `~/.claude/settings.json`:**
+**Content of `~/.claude/settings.json`:**
 
 ```json
 {
@@ -106,23 +106,23 @@ cp examples/claude-settings.json ~/.claude/settings.json
 }
 ```
 
-> **⚠️ Importante**: Reemplaza `/ruta/absoluta/` con la ruta real al directorio del proyecto.
+> **⚠️ Important**: Replace `/absolute/path/` with the actual path to the project directory.
 
-## 📖 Configuración Detallada
+## 📖 Detailed Configuration
 
-### Configuración de Hooks
+### Hook Configuration
 
-El sistema funciona mediante hooks de Claude Code que capturan automáticamente:
+The system works through Claude Code hooks that automatically capture:
 
-- ✅ **UserPromptSubmit**: Cada prompt que envías a Claude  
-- ✅ **Stop**: Respuestas completas de Claude con tokens precisos (acumula chunks de streaming)
-- ✅ **SessionStart**: Inicio de nuevas sesiones
-- ⚠️ **PostToolUse**: Uso de herramientas (opcional)
-- 🔧 **Token Parsing Mejorado**: Captura correcta de estadísticas de uso y contenido completo
+- ✅ **UserPromptSubmit**: Every prompt you send to Claude  
+- ✅ **Stop**: Complete Claude responses with precise tokens (accumulates streaming chunks)
+- ✅ **SessionStart**: New session initialization
+- ⚠️ **PostToolUse**: Tool usage (optional)
+- 🔧 **Enhanced Token Parsing**: Correct capture of usage statistics and complete content
 
-⚠️ **IMPORTANTE**: La estructura de hooks debe ser exactamente como se muestra. Claude Code requiere un array con objetos que contengan un campo `"hooks"` interno.
+⚠️ **IMPORTANT**: The hook structure must be exactly as shown. Claude Code requires an array with objects containing an internal `"hooks"` field.
 
-#### archivo: `~/.claude/hooks/api-logger.py`
+#### File: `~/.claude/hooks/api-logger.py`
 
 ```python
 #!/usr/bin/env python3
@@ -131,14 +131,14 @@ import sys
 import requests
 import os
 
-# Configuración
+# Configuration
 API_BASE_URL = 'http://localhost:3003'
 API_KEY = 'claude_api_secret_2024_change_me'
 
-# (ver examples/hook-setup.py para código completo)
+# (see examples/hook-setup.py for complete code)
 ```
 
-#### Archivo: `~/.claude/settings.json`
+#### File: `~/.claude/settings.json`
 
 ```json
 {
@@ -234,28 +234,28 @@ Here's a real example of what gets stored in MongoDB when the hooks are working 
 - **output_tokens**: May seem low due to internal Claude Code processing
 - **input_tokens**: Actual user message tokens
 
-### Variables de Entorno
+### Environment Variables
 
-Las variables están pre-configuradas en el contenedor monolítico:
+Variables are pre-configured in the monolithic container:
 
 ```env
-# API Configuration (pre-configurado)
+# API Configuration (pre-configured)
 NODE_ENV=production
 PORT=3000
 API_SECRET=claude_api_secret_2024_change_me
 
-# Database (interno del contenedor)
+# Database (internal to container)
 MONGODB_URI=mongodb://admin:claude_logger_2024@localhost:27017/conversations?authSource=admin
 REDIS_URL=redis://localhost:6379
 
 # Triple Storage System:
-# - MongoDB: Persistencia principal (90 días TTL)
-# - Redis: Cache secundario rápido
-# - Memory: Buffer ultra-rápido (1000 msgs)
-# - Auto-failover: Si MongoDB falla → Redis → Memory
+# - MongoDB: Main persistence (90-day TTL)
+# - Redis: Fast secondary cache
+# - Memory: Ultra-fast buffer (1000 msgs)
+# - Auto-failover: If MongoDB fails → Redis → Memory
 ```
 
-## 🏗️ Arquitectura Monolítica
+## 🏗️ Monolithic Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    
@@ -265,22 +265,22 @@ REDIS_URL=redis://localhost:6379
                                 │
                                 ▼
         ╔═══════════════════════════════════════════════╗
-        ║              CONTENEDOR MONOLÍTICO            ║
+        ║              MONOLITHIC CONTAINER             ║
         ║  ┌─────────────┐                             ║
-        ║  │   Nginx     │ :3003 (Puerto expuesto)      ║
+        ║  │   Nginx     │ :3003 (Exposed port)         ║
         ║  │ (Proxy)     │                             ║
         ║  └──────┬──────┘                             ║
         ║         │                                    ║
         ║         ▼                                    ║
         ║  ┌─────────────┐    ┌─────────────┐         ║
         ║  │  Node.js    │───▶│ MCP Server  │         ║
-        ║  │ API :3000   │    │ (Integrado) │         ║
+        ║  │ API :3000   │    │ (Integrated)│         ║
         ║  └──────┬──────┘    └─────────────┘         ║
         ║         │                                    ║
         ║  ┌──────▼──────┐    ┌─────────────┐         ║
         ║  │  MongoDB    │    │    Redis    │         ║
         ║  │  :27017     │    │    :6379    │         ║
-        ║  │(Persistente)│    │   (Cache)   │         ║
+        ║  │(Persistent) │    │   (Cache)   │         ║
         ║  └─────────────┘    └─────────────┘         ║
         ║                                              ║
         ║  ┌─────────────────────────────────────┐    ║
@@ -288,7 +288,7 @@ REDIS_URL=redis://localhost:6379
         ║  │         Ultra-fast Access           │    ║
         ║  └─────────────────────────────────────┘    ║
         ║                                              ║
-        ║         Gestionado por Supervisor           ║
+        ║         Managed by Supervisor               ║
         ╚═══════════════════════════════════════════════╝
 ```
 
@@ -296,53 +296,53 @@ REDIS_URL=redis://localhost:6379
 
 ### Core Endpoints
 
-| Endpoint | Method | Descripción |
+| Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check del sistema |
-| `/api/log` | POST | Guardar mensaje de conversación |
-| `/api/messages` | GET | Obtener mensajes recientes |
-| `/api/sessions` | GET | Listar sesiones |
-| `/api/search` | GET | Búsqueda de conversaciones |
-| `/api/cleanup` | DELETE | Limpiar datos antiguos |
+| `/health` | GET | System health check |
+| `/api/log` | POST | Save conversation message |
+| `/api/messages` | GET | Get recent messages |
+| `/api/sessions` | GET | List sessions |
+| `/api/search` | GET | Search conversations |
+| `/api/cleanup` | DELETE | Clean old data |
 
-### Ejemplos de Uso
+### Usage Examples
 
 ```bash
 # Health Check
 curl http://localhost:3003/health
 
-# Buscar conversaciones
+# Search conversations
 curl "http://localhost:3003/api/search?q=docker&days=7"
 
-# Ver mensajes recientes
+# View recent messages
 curl http://localhost:3003/api/messages
 ```
 
-## 🤖 Servidor MCP Integrado
+## 🤖 Integrated MCP Server
 
-El servidor MCP proporciona herramientas nativas para que Claude acceda a las conversaciones almacenadas:
+The MCP server provides native tools for Claude to access stored conversations:
 
-### 🛠️ Herramientas Disponibles
+### 🛠️ Available Tools
 
-| Herramienta | Descripción | Parámetros |
-|-------------|-------------|------------|
-| **`search_conversations`** | Buscar en historial con priorización por frescura | `query`, `days`, `include_resolved`, `limit` |
-| **`get_recent_conversations`** | Obtener conversaciones recientes priorizadas | `hours`, `project`, `limit` |
-| **`analyze_conversation_patterns`** | Analizar patrones y temas en conversaciones | `days`, `project` |
-| **`export_conversation`** | Exportar conversación completa en Markdown | `session_id` |
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| **`search_conversations`** | Search history with freshness prioritization | `query`, `days`, `include_resolved`, `limit` |
+| **`get_recent_conversations`** | Get recent prioritized conversations | `hours`, `project`, `limit` |
+| **`analyze_conversation_patterns`** | Analyze patterns and themes in conversations | `days`, `project` |
+| **`export_conversation`** | Export complete conversation in Markdown | `session_id` |
 
-### 🚀 Configuración del MCP
+### 🚀 MCP Configuration
 
-1. **Asegurar que el contenedor está corriendo**:
+1. **Ensure the container is running**:
    ```bash
-   docker compose ps  # Debe mostrar el contenedor healthy
+   docker compose ps  # Should show healthy container
    ```
 
-2. **Configurar MCP Server** (dos opciones disponibles):
+2. **Configure MCP Server** (two options available):
 
-   **🎯 Opción A: Usar .mcp.json del proyecto (recomendado)**
+   **🎯 Option A: Use project .mcp.json (recommended)**
    
-   El proyecto ya incluye `.mcp.json` preconfigurado:
+   The project already includes pre-configured `.mcp.json`:
 
    ```json
    {
@@ -359,9 +359,9 @@ El servidor MCP proporciona herramientas nativas para que Claude acceda a las co
    }
    ```
 
-   **🔧 Opción B: Configuración global en settings.json**
+   **🔧 Option B: Global settings.json configuration**
    
-   Si prefieres configuración global, agregar a `~/.claude/settings.json`:
+   If you prefer global configuration, add to `~/.claude/settings.json`:
 
    ```json
    {
@@ -369,7 +369,7 @@ El servidor MCP proporciona herramientas nativas para que Claude acceda a las co
        "mcpServers": {
          "conversation-logger": {
            "command": "node",
-           "args": ["/tu/ruta/completa/claude-conversation-logger/src/mcp-server.js"],
+           "args": ["/your/complete/path/claude-conversation-logger/src/mcp-server.js"],
            "env": {
              "API_URL": "http://localhost:3003",
              "API_KEY": "claude_api_secret_2024_change_me"
@@ -380,33 +380,33 @@ El servidor MCP proporciona herramientas nativas para que Claude acceda a las co
    }
    ```
 
-   > **💡 Ventaja del .mcp.json**: Claude Code lo detecta automáticamente sin editar configuración global.
+   > **💡 Advantage of .mcp.json**: Claude Code detects it automatically without editing global configuration.
 
-4. **Reiniciar Claude Code** para que tome la configuración
+4. **Restart Claude Code** to load the configuration
 
-5. **Probar el MCP** - Ahora puedes usar comandos como:
-   - "Busca conversaciones sobre docker en los últimos 3 días"
-   - "Muéstrame las conversaciones más recientes"
-   - "Analiza los patrones de mis conversaciones"
-   - "Exporta la sesión XYZ en markdown"
+5. **Test the MCP** - Now you can use commands like:
+   - "Search conversations about docker in the last 3 days"
+   - "Show me the most recent conversations"
+   - "Analyze my conversation patterns"
+   - "Export session XYZ in markdown"
 
-### ⚡ Características Inteligentes
+### ⚡ Smart Features
 
-- 🔥 **Priorización por frescura**: Score dinámico basado en tiempo
-- ✅ **Detección de resolución**: Identifica automáticamente problemas resueltos
-- 🎯 **Filtrado inteligente**: Excluye conversaciones resueltas por defecto
-- 📊 **Análisis de patrones**: Identifica proyectos activos, palabras clave y horarios
-- 🏷️ **Categorización automática**: Por proyecto, sesión y tipo de mensaje
-- 📈 **Métricas en tiempo real**: Actividad por horas y proyectos
+- 🔥 **Freshness prioritization**: Dynamic scoring based on time
+- ✅ **Resolution detection**: Automatically identifies resolved problems
+- 🎯 **Intelligent filtering**: Excludes resolved conversations by default
+- 📊 **Pattern analysis**: Identifies active projects, keywords and schedules
+- 🏷️ **Automatic categorization**: By project, session and message type
+- 📈 **Real-time metrics**: Activity by hours and projects
 
-### 🚀 **Rendimiento Optimizado**
+### 🚀 **Optimized Performance**
 
-- **⚡ Ultra-rápido**: Acceso instantáneo a mensajes en RAM
-- **💾 Persistente**: Redis backup automático sin impacto en performance
-- **🔄 Auto-scaling**: Se adapta automáticamente al volumen de datos
-- **🧹 Self-cleaning**: Limpieza automática para evitar overflow
-- **📈 Efficient**: Uso mínimo de recursos (~50MB RAM base)
-- **🔒 Stable**: No dependencias de bases de datos complejas
+- **⚡ Ultra-fast**: Instant access to messages in RAM
+- **💾 Persistent**: Automatic Redis backup without performance impact
+- **🔄 Auto-scaling**: Automatically adapts to data volume
+- **🧹 Self-cleaning**: Automatic cleanup to prevent overflow
+- **📈 Efficient**: Minimal resource usage (~50MB base RAM)
+- **🔒 Stable**: No complex database dependencies
 
 ## 🔧 Troubleshooting
 
@@ -496,247 +496,247 @@ node src/mcp-server.js
 # Should show: "🤖 MCP Server de Claude Conversation Logger iniciado"
 ```
 
-## 🛠️ Desarrollo
+## 🛠️ Development
 
-### Estructura del Proyecto
+### Project Structure
 
 ```
 claude-conversation-logger/
 ├── src/
-│   └── server.js          # API Server con MCP integrado
+│   └── server.js          # API Server with integrated MCP
 ├── config/
-│   ├── supervisord.conf   # Configuración de Supervisor
-│   ├── mongod.conf        # Configuración de MongoDB
-│   ├── redis.conf         # Configuración de Redis
-│   └── nginx.conf         # Configuración de Nginx proxy
+│   ├── supervisord.conf   # Supervisor configuration
+│   ├── mongod.conf        # MongoDB configuration
+│   ├── redis.conf         # Redis configuration
+│   └── nginx.conf         # Nginx proxy configuration
 ├── scripts/
-│   └── start.sh           # Script de inicialización del contenedor
+│   └── start.sh           # Container initialization script
 ├── .claude/
 │   └── hooks/
-│       └── api-logger.py  # Hook listo para usar
-├── docker-compose.yml     # Contenedor monolítico
-├── Dockerfile            # Imagen monolítica con todo incluido
-└── README.md             # Esta documentación
+│       └── api-logger.py  # Ready-to-use hook
+├── docker-compose.yml     # Monolithic container
+├── Dockerfile            # Monolithic image with everything included
+└── README.md             # This documentation
 ```
 
-### Comandos de Desarrollo
+### Development Commands
 
 ```bash
-# Iniciar contenedor monolítico
+# Start monolithic container
 docker compose up --build
 
-# Ver logs del contenedor completo
+# View complete container logs
 docker compose logs -f
 
-# Reconstruir el contenedor
+# Rebuild container
 docker compose up -d --build
 
-# Verificar servicios dentro del contenedor
+# Check services within container
 docker exec claude-logger-monolith supervisorctl status
 
-# Acceder al contenedor
+# Access container
 docker exec -it claude-logger-monolith bash
 
-# Limpiar todo y empezar de nuevo
+# Clean everything and start fresh
 docker compose down -v
 docker compose up -d --build
 ```
 
-### Ventajas del Contenedor Monolítico
+### Monolithic Container Advantages
 
-✅ **Simplicidad**: Un solo contenedor para gestionar  
-✅ **Performance**: Comunicación interna sin overhead de red  
-✅ **Portabilidad**: Fácil deployment en cualquier entorno  
-✅ **Gestión**: Supervisor maneja todos los procesos automáticamente  
-✅ **Debug**: Todos los logs en un lugar  
-✅ **Recursos**: Uso optimizado de memoria y CPU  
+✅ **Simplicity**: Single container to manage  
+✅ **Performance**: Internal communication without network overhead  
+✅ **Portability**: Easy deployment in any environment  
+✅ **Management**: Supervisor handles all processes automatically  
+✅ **Debug**: All logs in one place  
+✅ **Resources**: Optimized memory and CPU usage  
 
-### Servicios Incluidos
+### Included Services
 
-| Servicio | Puerto Interno | Estado | Función |
+| Service | Internal Port | Status | Function |
 |----------|---------------|---------|----------|
-| **Nginx** | 3003 (expuesto) | ✅ Running | Proxy reverso y balanceador |
-| **Node.js API** | 3000 | ✅ Running | API REST y servidor MCP |
-| **MongoDB** | 27017 | ✅ Running | Base de datos principal (90 días TTL) |
-| **Redis** | 6379 | ✅ Running | Cache secundario rápido |
-| **Memory Buffer** | - | ✅ Running | Buffer ultra-rápido (1000 msgs) |
-| **Supervisor** | - | ✅ Running | Gestión de procesos |
+| **Nginx** | 3003 (exposed) | ✅ Running | Reverse proxy and load balancer |
+| **Node.js API** | 3000 | ✅ Running | REST API and MCP server |
+| **MongoDB** | 27017 | ✅ Running | Main database (90-day TTL) |
+| **Redis** | 6379 | ✅ Running | Fast secondary cache |
+| **Memory Buffer** | - | ✅ Running | Ultra-fast buffer (1000 msgs) |
+| **Supervisor** | - | ✅ Running | Process management |
 
 ### 💾 **Triple Storage System**
 
-- **🗄️ MongoDB**: Persistencia principal con TTL de 90 días automático
-- **🚀 Redis**: Cache secundario rápido para consultas frecuentes  
-- **⚡ Memory**: Buffer ultra-rápido en RAM (1000 mensajes)
-- **🔄 Auto-failover**: MongoDB → Redis → Memory (redundancia completa)
-- **🧹 Auto-cleanup**: Limpieza automática en todos los niveles
-- **📊 Smart routing**: Lee desde MongoDB, cache en Memory
+- **🗄️ MongoDB**: Main persistence with automatic 90-day TTL
+- **🚀 Redis**: Fast secondary cache for frequent queries  
+- **⚡ Memory**: Ultra-fast RAM buffer (1000 messages)
+- **🔄 Auto-failover**: MongoDB → Redis → Memory (complete redundancy)
+- **🧹 Auto-cleanup**: Automatic cleanup at all levels
+- **📊 Smart routing**: Read from MongoDB, cache in Memory
 
-## 🔧 Configuración Avanzada
+## 🔧 Advanced Configuration
 
-### Personalizar Storage
+### Customize Storage
 
-El sistema usa storage híbrido optimizado:
+The system uses optimized hybrid storage:
 
 ```javascript
-// Configurar límites de memoria
-const MAX_MESSAGES = 1000;  // Mensajes en RAM
-const REDIS_BACKUP_INTERVAL = 5000;  // ms para sync
+// Configure memory limits
+const MAX_MESSAGES = 1000;  // Messages in RAM
+const REDIS_BACKUP_INTERVAL = 5000;  // ms for sync
 
-// Personalizar auto-cleanup
-const CLEANUP_OLDER_THAN = 7 * 24 * 60 * 60 * 1000;  // 7 días
+// Customize auto-cleanup
+const CLEANUP_OLDER_THAN = 7 * 24 * 60 * 60 * 1000;  // 7 days
 ```
 
-### Personalizar Hook de Logging
+### Customize Logging Hook
 
-El hook en `examples/hook-setup.py` puede ser modificado para:
+The hook in `examples/hook-setup.py` can be modified to:
 
-- Filtrar ciertos tipos de mensajes
-- Agregar metadata personalizada
-- Enviar notificaciones
-- Integrar con otros sistemas
+- Filter certain message types
+- Add custom metadata
+- Send notifications
+- Integrate with other systems
 
 ### Health Monitoring
 
 ```bash
-# Verificar estado de todos los servicios
+# Check status of all services
 curl http://localhost:3003/health
 
-# Estadísticas del storage híbrido
+# Hybrid storage statistics
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/stats
 
-# Verificar mensajes almacenados
+# Check stored messages
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/messages
 ```
 
-## 📊 Monitoreo y Logs
+## 📊 Monitoring and Logs
 
-### Ver logs en tiempo real
+### View real-time logs
 
 ```bash
-# Todos los servicios
+# All services
 docker compose logs -f
 
-# Solo API
+# API only
 docker compose logs -f api
 
-# Solo MongoDB
+# MongoDB only
 docker compose logs -f mongodb
 ```
 
-### Métricas y Estadísticas
+### Metrics and Statistics
 
 ```bash
-# Estado del sistema
+# System status
 curl http://localhost:3003/api/stats
 
-# Conversaciones por proyecto
+# Conversations by project
 curl http://localhost:3003/api/analytics?group_by=project
 
-# Actividad reciente
+# Recent activity
 curl http://localhost:3003/api/activity?hours=24
 ```
 
-## ❓ Troubleshooting
+## ❓ Advanced Troubleshooting
 
-### Problemas Comunes
+### Common Issues
 
-#### El hook no funciona
+#### Hook not working
 
 ```bash
-# 1. Verificar permisos
+# 1. Check permissions
 chmod +x ~/.claude/hooks/api-logger.py
 
-# 2. Verificar que la API esté disponible
+# 2. Verify API is available
 curl http://localhost:3003/health
 
-# 3. Probar el hook manualmente
+# 3. Test hook manually
 ./examples/hook-test.sh
 
-# 4. Verificar configuración de Claude Code
+# 4. Check Claude Code configuration
 cat ~/.claude/settings.json
 
-# 5. Debug del hook
+# 5. Debug hook
 echo '{"session_id":"test","hook_event_name":"UserPromptSubmit","prompt":"test","cwd":"'$(pwd)'"}' | \
   python3 ~/.claude/hooks/api-logger.py
 ```
 
-#### El servidor MCP no conecta
+#### MCP server not connecting
 
 ```bash
-# 1. Verificar ruta absoluta en settings.json
-pwd  # Comparar con la ruta en settings.json
+# 1. Check absolute path in settings.json
+pwd  # Compare with path in settings.json
 
-# 2. Probar el servidor MCP directamente
+# 2. Test MCP server directly
 node src/mcp-server.js
 
-# 3. Verificar variables de entorno
+# 3. Check environment variables
 export API_URL="http://localhost:3003"
 export API_KEY="claude_api_secret_2024_change_me"
 node src/mcp-server.js
 
-# 4. Debug de conexión
+# 4. Debug connection
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/messages?limit=1
 ```
 
-#### API no responde
+#### API not responding
 
 ```bash
-# Verificar que el contenedor está corriendo
+# Check container is running
 docker compose ps
 
-# Revisar logs
+# Review logs
 docker compose logs api
 
-# Verificar conectividad
+# Check connectivity
 curl http://localhost:3003/health
 ```
 
-#### Storage y performance
+#### Storage and performance
 
 ```bash
-# Verificar storage híbrido
+# Check hybrid storage
 docker exec claude-logger-monolith curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3000/api/stats
 
-# Ver uso de memoria
+# View memory usage
 docker exec claude-logger-monolith ps aux | grep node
 
-# Verificar Redis
+# Check Redis
 docker exec claude-logger-monolith redis-cli ping
 ```
 
-### Logs de Debug
+### Debug Logs
 
-Para habilitar logs detallados:
+To enable detailed logs:
 
 ```bash
-# Configurar en docker-compose.yml
+# Configure in docker-compose.yml
 environment:
   NODE_ENV: development
   DEBUG: "*"
 ```
 
-## 🤝 Contribución
+## 🤝 Contributing
 
-1. Fork el proyecto
-2. Crear feature branch (`git checkout -b feature/AmazingFeature`)
+1. Fork the project
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
 3. Commit changes (`git commit -m 'Add AmazingFeature'`)
 4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Abrir Pull Request
+5. Open Pull Request
 
-## 📄 Licencia
+## 📄 License
 
-MIT License - ver `LICENSE` para detalles.
+MIT License - see `LICENSE` for details.
 
-## 🙏 Créditos
+## 🙏 Credits
 
-- Construido para [Claude Code](https://claude.ai/code)
-- Usa [Model Context Protocol (MCP)](https://modelcontextprotocol.io)
-- Integración con MongoDB, Redis, y Docker
+- Built for [Claude Code](https://claude.ai/code)
+- Uses [Model Context Protocol (MCP)](https://modelcontextprotocol.io)
+- Integration with MongoDB, Redis, and Docker
 
 ---
 
-**⚡ Pro Tip**: Este sistema está diseñado para ser invisible. Una vez configurado, trabajará automáticamente en segundo plano, capturando todas tus conversaciones con Claude para búsqueda y análisis futuros.
+**⚡ Pro Tip**: This system is designed to be invisible. Once configured, it will work automatically in the background, capturing all your Claude conversations for future search and analysis.

@@ -1,48 +1,48 @@
-# 🏗️ Estructura Final del Proyecto
+# 🏗️ Final Project Structure
 
 ```
 claude-conversation-logger/
-├── 📄 README.md                  # Documentación principal completa
-├── 🚀 QUICK_START.md             # Guía de inicio rápido (5 min)
-├── 📋 PROJECT_STRUCTURE.md       # Este archivo - mapa del proyecto
-├── ⚖️ LICENSE                     # Licencia MIT
-├── 🐳 Dockerfile                 # Contenedor monolítico
-├── 🐳 docker-compose.yml         # Orquestación del contenedor
-├── 📦 package.json               # Dependencias y scripts de Node.js
-├── 📦 package-lock.json          # Lock de dependencias
-├── 🙈 .gitignore                 # Archivos ignorados por Git
+├── 📄 README.md                  # Complete main documentation
+├── 🚀 QUICK_START.md             # Quick start guide (5 min)
+├── 📋 PROJECT_STRUCTURE.md       # This file - project map
+├── ⚖️ LICENSE                     # MIT License
+├── 🐳 Dockerfile                 # Monolithic container
+├── 🐳 docker-compose.yml         # Container orchestration
+├── 📦 package.json               # Node.js dependencies and scripts
+├── 📦 package-lock.json          # Dependency lock
+├── 🙈 .gitignore                 # Files ignored by Git
 │
-├── 🔧 config/                    # Configuraciones del contenedor monolítico
-│   ├── supervisord.conf          # ⚙️ Gestión de procesos con Supervisor
-│   ├── mongod.conf               # 💾 Configuración de MongoDB
-│   ├── redis.conf                # 🔄 Configuración de Redis
-│   └── nginx.conf                # 🌐 Proxy reverso Nginx (3003→3000)
+├── 🔧 config/                    # Monolithic container configurations
+│   ├── supervisord.conf          # ⚙️ Process management with Supervisor
+│   ├── mongod.conf               # 💾 MongoDB configuration
+│   ├── redis.conf                # 🔄 Redis configuration
+│   └── nginx.conf                # 🌐 Nginx reverse proxy (3003→3000)
 │
 ├── 📜 scripts/
-│   └── start.sh                  # 🚀 Script de inicialización del contenedor
+│   └── start.sh                  # 🚀 Container initialization script
 │
-├── 🔌 src/                       # Código fuente
-│   ├── server.js                 # 🖥️ API REST principal (puerto 3000)
-│   └── mcp-server.js             # 🤖 Servidor MCP para Claude Code
+├── 🔌 src/                       # Source code
+│   ├── server.js                 # 🖥️ Main REST API (port 3000)
+│   └── mcp-server.js             # 🤖 MCP Server for Claude Code
 │
-├── 💡 examples/                  # Ejemplos y configuraciones
-│   ├── claude-settings.json      # ⚙️ Configuración completa de Claude Code
-│   ├── hook-test.sh              # 🧪 Script de test del hook
-│   └── mcp-usage-examples.md     # 📖 Ejemplos de uso del MCP
+├── 💡 examples/                  # Examples and configurations
+│   ├── claude-settings.json      # ⚙️ Complete Claude Code configuration
+│   ├── hook-test.sh              # 🧪 Hook test script
+│   └── mcp-usage-examples.md     # 📖 MCP usage examples
 │
-└── .claude/                      # Integración con Claude Code
+└── .claude/                      # Claude Code integration
     └── hooks/
-        └── api-logger.py         # 🪝 Hook listo para copiar a ~/.claude/
+        └── api-logger.py         # 🪝 Hook ready to copy to ~/.claude/
 ```
 
-## 📦 Arquitectura del Contenedor Monolítico
+## 📦 Monolithic Container Architecture
 
 ```
 ┌─────────────────────────────────────────┐
-│           CONTENEDOR ÚNICO              │
+│           SINGLE CONTAINER              │
 │  ┌─────────────────────────────────┐   │
 │  │        Supervisor Manager       │   │
-│  │      (Gestión de Procesos)      │   │
+│  │      (Process Management)       │   │
 │  └─────────────────────────────────┘   │
 │              │                         │
 │  ┌───────────┼───────────────────────┐ │
@@ -60,12 +60,12 @@ claude-conversation-logger/
 │  │  └──────────┘  └──────────┘     │ │
 │  └─────────────────────────────────┘ │
 │                                       │
-│  Puerto expuesto: 3003                │
-│  Volumen persistente: claude_logger   │
+│  Exposed port: 3003                   │
+│  Persistent volume: claude_logger     │
 └─────────────────────────────────────────┘
 ```
 
-## 🔄 Flujo de Datos
+## 🔄 Data Flow
 
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
@@ -91,66 +91,66 @@ claude-conversation-logger/
                               └─────────┘              └─────────┘
 ```
 
-## 🎯 Puntos de Entrada
+## 🎯 Entry Points
 
-| Punto de Acceso | Puerto | Descripción |
+| Access Point | Port | Description |
 |------------------|--------|-------------|
-| **HTTP API** | 3003 | API REST para logging y consultas |
-| **MCP Server** | stdio | Servidor MCP para Claude Code |
-| **Health Check** | 3003/health | Estado del sistema |
-| **Docker Container** | - | Contenedor monolítico gestionado |
+| **HTTP API** | 3003 | REST API for logging and queries |
+| **MCP Server** | stdio | MCP Server for Claude Code |
+| **Health Check** | 3003/health | System status |
+| **Docker Container** | - | Managed monolithic container |
 
-## 🗂️ Archivos de Configuración Clave
+## 🗂️ Key Configuration Files
 
-| Archivo | Propósito | Usado por |
+| File | Purpose | Used by |
 |---------|-----------|-----------|
-| `config/supervisord.conf` | Gestión de todos los procesos | Supervisor |
+| `config/supervisord.conf` | Management of all processes | Supervisor |
 | `config/nginx.conf` | Proxy 3003→3000 | Nginx |
-| `config/mongod.conf` | Base de datos principal | MongoDB |
-| `config/redis.conf` | Cache y sesiones | Redis |
-| `examples/claude-settings.json` | Configuración completa | Claude Code |
-| `.claude/hooks/api-logger.py` | Hook automático | Claude Code |
+| `config/mongod.conf` | Main database | MongoDB |
+| `config/redis.conf` | Cache and sessions | Redis |
+| `examples/claude-settings.json` | Complete configuration | Claude Code |
+| `.claude/hooks/api-logger.py` | Automatic hook | Claude Code |
 
-## 🔧 Scripts Útiles
+## 🔧 Useful Scripts
 
 ```bash
-# Desarrollo
-npm run start          # Iniciar API directamente
-npm run mcp            # Iniciar MCP server directamente
-npm run test:hook      # Probar hook manualmente
+# Development
+npm run start          # Start API directly
+npm run mcp            # Start MCP server directly
+npm run test:hook      # Test hook manually
 
 # Docker
-npm run docker:up      # Iniciar contenedor
-npm run docker:down    # Detener contenedor  
-npm run docker:logs    # Ver logs
-npm run docker:build   # Reconstruir contenedor
+npm run docker:up      # Start container
+npm run docker:down    # Stop container  
+npm run docker:logs    # View logs
+npm run docker:build   # Rebuild container
 
 # Testing
-./examples/hook-test.sh    # Test completo del hook
-curl localhost:3003/health # Health check rápido
+./examples/hook-test.sh    # Complete hook test
+curl localhost:3003/health # Quick health check
 ```
 
-## 📊 Métricas del Proyecto
+## 📊 Project Metrics
 
-- **Líneas de código**: ~1,200
-- **Archivos de configuración**: 6
-- **Servicios en contenedor**: 4 (Nginx, Node.js, MongoDB, Redis)
-- **Puertos expuestos**: 1 (3003)
-- **Dependencias principales**: 9
-- **Tiempo de setup**: 5 minutos
-- **Herramientas MCP**: 4
+- **Lines of code**: ~1,200
+- **Configuration files**: 6
+- **Services in container**: 4 (Nginx, Node.js, MongoDB, Redis)
+- **Exposed ports**: 1 (3003)
+- **Main dependencies**: 9
+- **Setup time**: 5 minutes
+- **MCP tools**: 4
 
-## 🎉 Estado Final
+## 🎉 Final Status
 
-✅ **Contenedor monolítico funcional**  
-✅ **API REST completa**  
-✅ **Servidor MCP integrado**  
-✅ **Hook de Claude Code listo**  
-✅ **Documentación completa**  
-✅ **Ejemplos de uso**  
-✅ **Scripts de testing**  
-✅ **Estructura limpia para GitHub**
+✅ **Functional monolithic container**  
+✅ **Complete REST API**  
+✅ **Integrated MCP server**  
+✅ **Claude Code hook ready**  
+✅ **Complete documentation**  
+✅ **Usage examples**  
+✅ **Testing scripts**  
+✅ **Clean structure for GitHub**
 
 ---
 
-**🚀 Ready to ship!** El proyecto está completamente configurado y listo para usar.
+**🚀 Ready to ship!** The project is completely configured and ready to use.

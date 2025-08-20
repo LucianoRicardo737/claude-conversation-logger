@@ -1,31 +1,31 @@
 #!/bin/bash
 
-echo "=== Iniciando Claude Conversation Logger Monolith ==="
+echo "=== Starting Claude Conversation Logger Monolith ==="
 
-# Crear directorios de logs si no existen
+# Create log directories if they don't exist
 mkdir -p /var/log/mongodb /var/log/redis /var/log/nginx /var/log/supervisor
 mkdir -p /var/run/redis
 
-# Configurar permisos
+# Configure permissions
 chown mongodb:mongodb /var/log/mongodb /data/db
 chown redis:redis /var/log/redis /var/lib/redis /var/run/redis
 chown www-data:www-data /var/log/nginx
 chown appuser:appuser /app/logs
 
-# La configuración de nginx ya está copiada en el Dockerfile
+# Nginx configuration is already copied in the Dockerfile
 
-# Inicializar MongoDB con usuario admin si es primera vez
+# Initialize MongoDB with admin user if it's the first time
 if [ ! -f /data/db/.initialized ]; then
-    echo "Inicializando MongoDB..."
+    echo "Initializing MongoDB..."
     
-    # Iniciar MongoDB sin autenticación para crear el usuario admin
+    # Start MongoDB without authentication to create admin user
     mongod --config /etc/mongod.conf --noauth &
     MONGOD_PID=$!
     
-    # Esperar a que MongoDB esté listo
+    # Wait for MongoDB to be ready
     sleep 20
     
-    # Crear usuario admin
+    # Create admin user
     mongosh admin --eval 'db.createUser({
         user: "admin",
         pwd: "claude_logger_2024",
@@ -36,7 +36,7 @@ if [ ! -f /data/db/.initialized ]; then
         ]
     })'
     
-    # Crear base de datos y colecciones
+    # Create database and collections
     mongosh conversations -u admin -p claude_logger_2024 --authenticationDatabase admin --eval '
         db.createCollection("sessions");
         db.createCollection("messages");
@@ -47,23 +47,23 @@ if [ ! -f /data/db/.initialized ]; then
         db.messages.createIndex({"created_at": 1}, {"expireAfterSeconds": 7776000});
     '
     
-    # Detener MongoDB temporal
+    # Stop temporary MongoDB
     kill $MONGOD_PID
     wait $MONGOD_PID
     
-    # Marcar como inicializado
+    # Mark as initialized
     touch /data/db/.initialized
     chown mongodb:mongodb /data/db/.initialized
     
-    echo "MongoDB inicializado exitosamente"
+    echo "MongoDB initialized successfully"
 fi
 
-echo "MongoDB: Puerto 27017 (interno)"
-echo "Redis: Puerto 6379 (interno)" 
-echo "Node.js API: Puerto 3000 (interno)"
-echo "Nginx Proxy: Puerto 3003 (expuesto)"
-echo "MCP Server: Incluido en Node.js"
+echo "MongoDB: Port 27017 (internal)"
+echo "Redis: Port 6379 (internal)" 
+echo "Node.js API: Port 3000 (internal)"
+echo "Nginx Proxy: Port 3003 (exposed)"
+echo "MCP Server: Included in Node.js"
 echo "=============================================="
 
-# Iniciar Supervisor
+# Start Supervisor
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
