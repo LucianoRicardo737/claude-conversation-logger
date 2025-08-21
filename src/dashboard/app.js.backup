@@ -141,16 +141,16 @@ const Dashboard = {
             exportFormat: 'json',
             animationTimeout: null, // Para debounce de animaciones
             loadingMessage: '', // Mensaje de loading personalizado
-            isDarkMode: true, // Estado del dark mode (default: dark)
-            store: window.store // Agregar store directamente al data
+            isDarkMode: true // Estado del dark mode (default: dark)
         };
     },
     
     computed: {
+        store() {
+            return store;
+        },
         
         filteredProjects() {
-            if (!this.store.conversations || !Array.isArray(this.store.conversations)) return [];
-            
             let projects = this.store.conversations.filter(project => {
                 if (!this.searchFilters.project_filter) return true;
                 return project.name.toLowerCase().includes(this.searchFilters.project_filter.toLowerCase());
@@ -207,8 +207,6 @@ const Dashboard = {
         },
         
         topProjects() {
-            if (!this.store.conversations || !Array.isArray(this.store.conversations)) return [];
-            
             let projects = [...this.store.conversations];
             // Ordenar por última actividad (más recientes primero)
             return projects.sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity)).slice(0, 5);
@@ -216,18 +214,14 @@ const Dashboard = {
         
         activeSessions() {
             let activeSessions = [];
-            if (this.store.conversations && Array.isArray(this.store.conversations)) {
-                this.store.conversations.forEach(project => {
-                    if (project.sessions && Array.isArray(project.sessions)) {
-                        project.sessions.filter(s => s.is_active).forEach(session => {
-                            activeSessions.push({
-                                ...session,
-                                projectName: project.name
-                            });
-                        });
-                    }
+            this.store.conversations.forEach(project => {
+                project.sessions.filter(s => s.is_active).forEach(session => {
+                    activeSessions.push({
+                        ...session,
+                        projectName: project.name
+                    });
                 });
-            }
+            });
             // Ordenar por fecha de inicio (más recientes primero)
             return activeSessions.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
         },
@@ -260,8 +254,10 @@ const Dashboard = {
         
         hasSearchOrFilters() {
             return this.store.searchQuery.trim() !== '' || this.hasActiveFilters;
-        },
-        
+        }
+    },
+
+    computed: {
         getMessagesStats() {
             const projects = this.store.conversations || [];
             const allSessions = projects.flatMap(p => p.sessions || []);
@@ -383,19 +379,6 @@ const Dashboard = {
                 costsByProject: costsByProject.slice(0, 10), // Top 10
                 topCostlyProjects: costsByProject.slice(0, 5)
             };
-        },
-
-        getCostsByDayArray() {
-            const totalCost = this.getCostsStats.totalCost;
-            return [
-                {name: 'Lunes', cost: totalCost * 0.18, percentage: 18},
-                {name: 'Martes', cost: totalCost * 0.22, percentage: 22},
-                {name: 'Miércoles', cost: totalCost * 0.25, percentage: 25},
-                {name: 'Jueves', cost: totalCost * 0.15, percentage: 15},
-                {name: 'Viernes', cost: totalCost * 0.12, percentage: 12},
-                {name: 'Sábado', cost: totalCost * 0.05, percentage: 5},
-                {name: 'Domingo', cost: totalCost * 0.03, percentage: 3}
-            ];
         }
     },
     
@@ -1258,51 +1241,6 @@ const Dashboard = {
                                     <i class="fas fa-project-diagram mr-1"></i>
                                     Proyectos
                                 </button>
-                                
-                                <!-- Analysis Menus -->
-                                <button 
-                                    @click="activeView = 'stats-messages'"
-                                    :class="['px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                                             activeView === 'stats-messages' 
-                                             ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:text-purple-600']"
-                                    title="Análisis de Mensajes"
-                                >
-                                    <i class="fas fa-comment mr-1"></i>
-                                    Mensajes
-                                </button>
-                                
-                                <button 
-                                    @click="activeView = 'stats-sessions'"
-                                    :class="['px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                                             activeView === 'stats-sessions' 
-                                             ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:text-green-600']"
-                                    title="Análisis de Sesiones"
-                                >
-                                    <i class="fas fa-layer-group mr-1"></i>
-                                    Sesiones
-                                </button>
-                                
-                                <button 
-                                    @click="activeView = 'stats-projects'"
-                                    :class="['px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                                             activeView === 'stats-projects' 
-                                             ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:text-indigo-600']"
-                                    title="Análisis de Proyectos"
-                                >
-                                    <i class="fas fa-chart-bar mr-1"></i>
-                                    Análisis
-                                </button>
-                                
-                                <button 
-                                    @click="activeView = 'stats-costs'"
-                                    :class="['px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                                             activeView === 'stats-costs' 
-                                             ? 'bg-orange-100 text-orange-700' : 'text-gray-600 hover:text-orange-600']"
-                                    title="Análisis de Costos"
-                                >
-                                    <i class="fas fa-dollar-sign mr-1"></i>
-                                    Costos
-                                </button>
                             </nav>
                         </div>
                         
@@ -1370,6 +1308,7 @@ const Dashboard = {
             </header>
 
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" :class="{ 'content-blurred': store.isLoading }">
+
                 <!-- Views Container with Transitions -->
                 <transition name="view" mode="out-in">
                     <!-- DASHBOARD PRINCIPAL -->
@@ -1979,7 +1918,7 @@ const Dashboard = {
                             <span class="text-gray-400">/</span>
                             <span class="text-gray-700 font-medium">Análisis de Mensajes</span>
                         </div>
-                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
                         </button>
                     </div>
@@ -2084,104 +2023,6 @@ const Dashboard = {
                             </div>
                         </div>
                     </div>
-
-                    <!-- Timeline de Actividad Reciente -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-clock text-green-500 mr-2"></i>Actividad Reciente por Período
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="text-center p-4 bg-blue-50 rounded-lg">
-                                <div class="text-2xl font-bold text-blue-600">{{ Math.floor(getMessagesStats.totalMessages * 0.08).toLocaleString() }}</div>
-                                <div class="text-sm text-gray-600">Última hora</div>
-                            </div>
-                            <div class="text-center p-4 bg-green-50 rounded-lg">
-                                <div class="text-2xl font-bold text-green-600">{{ Math.floor(getMessagesStats.totalMessages * 0.35).toLocaleString() }}</div>
-                                <div class="text-sm text-gray-600">Últimas 24h</div>
-                            </div>
-                            <div class="text-center p-4 bg-purple-50 rounded-lg">
-                                <div class="text-2xl font-bold text-purple-600">{{ getMessagesStats.totalMessages.toLocaleString() }}</div>
-                                <div class="text-sm text-gray-600">Última semana</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Métricas de Performance y Uso -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <div class="flex items-center">
-                                <i class="fas fa-tachometer-alt text-blue-500 text-2xl mr-3"></i>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">Velocidad Promedio</p>
-                                    <p class="text-2xl font-bold text-gray-900">1.2s</p>
-                                    <p class="text-xs text-gray-400">por respuesta</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <div class="flex items-center">
-                                <i class="fas fa-chart-line text-green-500 text-2xl mr-3"></i>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">Eficiencia</p>
-                                    <p class="text-2xl font-bold text-gray-900">94%</p>
-                                    <p class="text-xs text-gray-400">respuestas útiles</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <div class="flex items-center">
-                                <i class="fas fa-fire text-orange-500 text-2xl mr-3"></i>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">Pico de Actividad</p>
-                                    <p class="text-2xl font-bold text-gray-900">14:30</p>
-                                    <p class="text-xs text-gray-400">hora del día</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <div class="flex items-center">
-                                <i class="fas fa-users text-purple-500 text-2xl mr-3"></i>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">Interacción</p>
-                                    <p class="text-2xl font-bold text-gray-900">2.3</p>
-                                    <p class="text-xs text-gray-400">msgs por sesión</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Análisis de Longitud de Mensajes -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-ruler text-indigo-500 mr-2"></i>Análisis de Longitud de Mensajes
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="text-center">
-                                <div class="text-lg font-semibold text-gray-700">Mensajes Cortos</div>
-                                <div class="text-3xl font-bold text-blue-600">{{ Math.floor(getMessagesStats.totalMessages * 0.45).toLocaleString() }}</div>
-                                <div class="text-sm text-gray-500">≤ 50 caracteres</div>
-                                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                                    <div class="bg-blue-600 h-2 rounded-full" style="width: 45%"></div>
-                                </div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-lg font-semibold text-gray-700">Mensajes Medios</div>
-                                <div class="text-3xl font-bold text-green-600">{{ Math.floor(getMessagesStats.totalMessages * 0.35).toLocaleString() }}</div>
-                                <div class="text-sm text-gray-500">51 - 200 caracteres</div>
-                                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                                    <div class="bg-green-600 h-2 rounded-full" style="width: 35%"></div>
-                                </div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-lg font-semibold text-gray-700">Mensajes Largos</div>
-                                <div class="text-3xl font-bold text-orange-600">{{ Math.floor(getMessagesStats.totalMessages * 0.20).toLocaleString() }}</div>
-                                <div class="text-sm text-gray-500">> 200 caracteres</div>
-                                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                                    <div class="bg-orange-600 h-2 rounded-full" style="width: 20%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- VISTA DETALLADA: SESIONES -->
@@ -2195,7 +2036,7 @@ const Dashboard = {
                             <span class="text-gray-400">/</span>
                             <span class="text-gray-700 font-medium">Análisis de Sesiones</span>
                         </div>
-                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
                         </button>
                     </div>
@@ -2280,90 +2121,6 @@ const Dashboard = {
                             </div>
                         </div>
                     </div>
-
-                    <!-- Estado de Sesiones en Tiempo Real -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-pulse text-green-500 mr-2"></i>Estado en Tiempo Real
-                            </h3>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
-                                        <span class="text-sm font-medium">Sesiones Activas</span>
-                                    </div>
-                                    <span class="font-bold text-green-700">{{ getSessionsStats.activeSessions }}</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                                        <span class="text-sm font-medium">En Pausa</span>
-                                    </div>
-                                    <span class="font-bold text-blue-700">{{ getSessionsStats.totalSessions - getSessionsStats.activeSessions }}</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
-                                        <span class="text-sm font-medium">Finalizadas Hoy</span>
-                                    </div>
-                                    <span class="font-bold text-purple-700">{{ Math.floor(getSessionsStats.totalSessions * 0.6) }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-chart-bar text-blue-500 mr-2"></i>Duración Promedio
-                            </h3>
-                            <div class="space-y-4">
-                                <div class="text-center">
-                                    <div class="text-3xl font-bold text-blue-600">25m</div>
-                                    <div class="text-sm text-gray-500">Duración promedio por sesión</div>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4 text-center">
-                                    <div>
-                                        <div class="text-lg font-semibold text-green-600">8m</div>
-                                        <div class="text-xs text-gray-500">Mínima</div>
-                                    </div>
-                                    <div>
-                                        <div class="text-lg font-semibold text-orange-600">2h 15m</div>
-                                        <div class="text-xs text-gray-500">Máxima</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Ranking de Sesiones por Actividad -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-trophy text-yellow-500 mr-2"></i>Ranking de Actividad por Día de la Semana
-                        </h3>
-                        <div class="space-y-3">
-                            <div v-for="(day, index) in [
-                                {name: 'Lunes', sessions: Math.floor(getSessionsStats.totalSessions * 0.18), percentage: 18},
-                                {name: 'Martes', sessions: Math.floor(getSessionsStats.totalSessions * 0.22), percentage: 22},
-                                {name: 'Miércoles', sessions: Math.floor(getSessionsStats.totalSessions * 0.25), percentage: 25},
-                                {name: 'Jueves', sessions: Math.floor(getSessionsStats.totalSessions * 0.15), percentage: 15},
-                                {name: 'Viernes', sessions: Math.floor(getSessionsStats.totalSessions * 0.12), percentage: 12},
-                                {name: 'Sábado', sessions: Math.floor(getSessionsStats.totalSessions * 0.05), percentage: 5},
-                                {name: 'Domingo', sessions: Math.floor(getSessionsStats.totalSessions * 0.03), percentage: 3}
-                            ]" :key="day.name" 
-                            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div class="flex items-center">
-                                    <span class="w-6 h-6 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center mr-3">{{ index + 1 }}</span>
-                                    <span class="font-medium text-gray-900">{{ day.name }}</span>
-                                </div>
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-24 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-blue-600 h-2 rounded-full" :style="{ width: day.percentage + '%' }"></div>
-                                    </div>
-                                    <span class="font-semibold text-gray-700 text-sm">{{ day.sessions }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- VISTA DETALLADA: PROYECTOS -->
@@ -2377,7 +2134,7 @@ const Dashboard = {
                             <span class="text-gray-400">/</span>
                             <span class="text-gray-700 font-medium">Análisis de Proyectos</span>
                         </div>
-                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
                         </button>
                     </div>
@@ -2428,7 +2185,7 @@ const Dashboard = {
                             <i class="fas fa-chart-line text-purple-500 mr-2"></i>Ranking de Actividad por Proyecto
                         </h3>
                         <div class="overflow-x-auto">
-                            <table class="min-w-full ranking-table">
+                            <table class="min-w-full">
                                 <thead>
                                     <tr class="bg-gray-50">
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
@@ -2461,96 +2218,6 @@ const Dashboard = {
                             </table>
                         </div>
                     </div>
-
-                    <!-- Distribución de Tipos de Proyecto -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-chart-pie text-purple-500 mr-2"></i>Distribución por Tipo de Proyecto
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div class="text-center p-4 bg-blue-50 rounded-lg">
-                                <div class="text-2xl font-bold text-blue-600">40%</div>
-                                <div class="text-sm text-gray-600">Desarrollo</div>
-                                <div class="text-xs text-gray-500">{{ Math.floor(getProjectsStats.totalProjects * 0.4) }} proyectos</div>
-                            </div>
-                            <div class="text-center p-4 bg-green-50 rounded-lg">
-                                <div class="text-2xl font-bold text-green-600">30%</div>
-                                <div class="text-sm text-gray-600">Investigación</div>
-                                <div class="text-xs text-gray-500">{{ Math.floor(getProjectsStats.totalProjects * 0.3) }} proyectos</div>
-                            </div>
-                            <div class="text-center p-4 bg-purple-50 rounded-lg">
-                                <div class="text-2xl font-bold text-purple-600">20%</div>
-                                <div class="text-sm text-gray-600">Documentación</div>
-                                <div class="text-xs text-gray-500">{{ Math.floor(getProjectsStats.totalProjects * 0.2) }} proyectos</div>
-                            </div>
-                            <div class="text-center p-4 bg-orange-50 rounded-lg">
-                                <div class="text-2xl font-bold text-orange-600">10%</div>
-                                <div class="text-sm text-gray-600">Experimentación</div>
-                                <div class="text-xs text-gray-500">{{ Math.floor(getProjectsStats.totalProjects * 0.1) }} proyectos</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Métricas de Rendimiento por Proyecto -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-rocket text-green-500 mr-2"></i>Proyectos Más Productivos
-                            </h3>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">claude-conversation-logger</div>
-                                        <div class="text-xs text-gray-500">{{ Math.floor(1063 / 3).toLocaleString() }} msgs/sesión promedio</div>
-                                    </div>
-                                    <span class="text-green-600 font-semibold">354</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">uniCommerce</div>
-                                        <div class="text-xs text-gray-500">{{ Math.floor(162 / 5).toLocaleString() }} msgs/sesión promedio</div>
-                                    </div>
-                                    <span class="text-blue-600 font-semibold">32</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">scripts</div>
-                                        <div class="text-xs text-gray-500">{{ Math.floor(35 / 1).toLocaleString() }} msgs/sesión promedio</div>
-                                    </div>
-                                    <span class="text-purple-600 font-semibold">35</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-clock text-orange-500 mr-2"></i>Proyectos Más Recientes
-                            </h3>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">claude-conversation-logger</div>
-                                        <div class="text-xs text-gray-500">Última actividad: hace 2 horas</div>
-                                    </div>
-                                    <span class="text-green-500 text-xs">●</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">uniCommerce</div>
-                                        <div class="text-xs text-gray-500">Última actividad: hace 1 día</div>
-                                    </div>
-                                    <span class="text-gray-400 text-xs">●</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">scripts</div>
-                                        <div class="text-xs text-gray-500">Última actividad: hace 3 días</div>
-                                    </div>
-                                    <span class="text-gray-400 text-xs">●</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- VISTA DETALLADA: COSTOS -->
@@ -2564,7 +2231,7 @@ const Dashboard = {
                             <span class="text-gray-400">/</span>
                             <span class="text-gray-700 font-medium">Análisis de Costos</span>
                         </div>
-                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                        <button @click="activeView = 'dashboard'" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
                         </button>
                     </div>
@@ -2648,102 +2315,6 @@ const Dashboard = {
                                         </div>
                                     </div>
                                     <span class="font-semibold text-orange-600">\${{ parseFloat(project.cost).toFixed(3) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Análisis de Tendencias de Costo -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-chart-line text-blue-500 mr-2"></i>Tendencias de Costo
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="text-center p-4 bg-blue-50 rounded-lg">
-                                <div class="text-2xl font-bold text-blue-600">{{ formatCurrency(getCostsStats.totalCost * 0.25) }}</div>
-                                <div class="text-sm text-gray-600">Esta Semana</div>
-                                <div class="text-xs text-green-500">↑ 12% vs anterior</div>
-                            </div>
-                            <div class="text-center p-4 bg-green-50 rounded-lg">
-                                <div class="text-2xl font-bold text-green-600">{{ formatCurrency(getCostsStats.totalCost * 0.60) }}</div>
-                                <div class="text-sm text-gray-600">Este Mes</div>
-                                <div class="text-xs text-orange-500">↓ 5% vs anterior</div>
-                            </div>
-                            <div class="text-center p-4 bg-purple-50 rounded-lg">
-                                <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(getCostsStats.totalCost * 0.85) }}</div>
-                                <div class="text-sm text-gray-600">Este Año</div>
-                                <div class="text-xs text-green-500">↑ 34% vs anterior</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Comparación de Eficiencia de Costo -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-balance-scale text-green-500 mr-2"></i>Eficiencia por Proyecto
-                            </h3>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">scripts</div>
-                                        <div class="text-xs text-gray-500">Más eficiente</div>
-                                    </div>
-                                    <span class="text-green-600 font-semibold">$0.002/msg</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">back_sync_tech_products</div>
-                                        <div class="text-xs text-gray-500">Eficiencia media</div>
-                                    </div>
-                                    <span class="text-yellow-600 font-semibold">$0.002/msg</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-gray-900">claude-conversation-logger</div>
-                                        <div class="text-xs text-gray-500">Menos eficiente</div>
-                                    </div>
-                                    <span class="text-orange-600 font-semibold">$0.002/msg</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-piggy-bank text-purple-500 mr-2"></i>Proyección de Ahorro
-                            </h3>
-                            <div class="space-y-4">
-                                <div class="text-center p-4 bg-purple-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-purple-600">$0.85</div>
-                                    <div class="text-sm text-gray-600">Ahorro Mensual Potencial</div>
-                                    <div class="text-xs text-gray-500">Optimizando consultas</div>
-                                </div>
-                                <div class="text-center p-4 bg-blue-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-blue-600">$10.20</div>
-                                    <div class="text-sm text-gray-600">Ahorro Anual Estimado</div>
-                                    <div class="text-xs text-gray-500">Con mejores prácticas</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Historial de Costos por Día -->
-                    <div class="bg-white rounded-lg shadow-sm p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-calendar-alt text-indigo-500 mr-2"></i>Distribución de Costos por Día de la Semana
-                        </h3>
-                        <div class="space-y-3">
-                            <div v-for="(day, index) in getCostsByDayArray" :key="day.name" 
-                            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div class="flex items-center">
-                                    <span class="w-6 h-6 bg-indigo-500 text-white text-xs rounded-full flex items-center justify-center mr-3">{{ index + 1 }}</span>
-                                    <span class="font-medium text-gray-900">{{ day.name }}</span>
-                                </div>
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-24 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-indigo-600 h-2 rounded-full" :style="{ width: day.percentage + '%' }"></div>
-                                    </div>
-                                    <span class="font-semibold text-gray-700 text-sm">{{ formatCurrency(day.cost) }}</span>
                                 </div>
                             </div>
                         </div>

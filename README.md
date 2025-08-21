@@ -398,9 +398,9 @@ curl -H "X-API-Key: claude_api_secret_2024_change_me" \
 }
 ```
 
-## 📊 **Visual Dashboard**
+## 📊 **Visual Dashboard - Complete Feature Showcase**
 
-The system now includes a **comprehensive HTML dashboard** with real-time statistics and interactive charts.
+The system includes a **comprehensive HTML dashboard** with **real-time gRPC updates**, complete analytics and interactive visualizations showcasing all conversation logging capabilities.
 
 ### 🚀 **Accessing the Dashboard**
 
@@ -412,80 +412,150 @@ http://localhost:3003/dashboard
 curl -I http://localhost:3003/dashboard
 ```
 
-### 🎯 **Dashboard Features**
+## 🎬 **Complete Dashboard Walkthrough**
 
-#### **📈 Key Metrics Cards**
-- **Total Messages**: Complete conversation count
-- **Total Cost**: Real-time cost tracking with USD precision
-- **Total Tokens**: Aggregated token consumption across all types
-- **Active Projects**: Multi-tenant project tracking
+### **1. 📊 Dashboard Overview - Real-time gRPC Updates**
 
-#### **📊 Interactive Charts**
-- **Token Distribution (Donut Chart)**: OpenTelemetry-compliant breakdown
-  - Input tokens (user prompts)
-  - Output tokens (assistant responses) 
-  - Cache Read tokens (90% discount reuse)
-  - Cache Creation tokens (first-time context)
-  
-- **Project Activity (Bar Chart)**: Message distribution across projects
-  - Real-time activity tracking
-  - Percentage-based progress bars
+![Dashboard Overview Light](./docs/screenshots/01-dashboard-overview-light.png)
 
-#### **🤖 Model Usage Table**
-- **Per-Model Statistics**: Token usage and costs by Claude model
-- **Request Tracking**: Number of requests per model
-- **Cost Breakdown**: Detailed USD costs with 4-decimal precision
+![Dashboard Overview Dark](./docs/screenshots/16-dashboard-overview-dark.png)
+
+**Key Features:**
+- **🔄 Real-time gRPC Stats**: Updates every 5 seconds via gRPC streaming
+- **💬 Total Messages**: Live count with real-time increments
+- **💰 Cost Tracking**: Real-time cost calculation with 4-decimal USD precision
+- **🎯 Token Metrics**: Live token consumption across all types (OpenTelemetry compliant)
+- **🏗️ Active Projects**: Multi-tenant project tracking with live activity indicators
+- **🌓 Dark/Light Mode**: Seamless theme switching with persistent state
+
+### **2. 🔄 Real-time Statistics & Active Sessions**
+
+![Real-time Stats Light](./docs/screenshots/02-realtime-stats-light.png)
+
+**Real-time gRPC Features:**
+- **📡 Live Session Monitoring**: Active sessions with "En vivo" indicators
+- **⚡ Instant Updates**: New messages appear immediately via gRPC streaming
+- **🎬 Animated Counters**: Numbers animate when updated via real-time data
+- **🔔 Activity Notifications**: Visual feedback for new conversation activity
+
+### **3. 📈 Projects Overview & Activity Tracking**
+
+![Active Projects Light](./docs/screenshots/03-active-projects-light.png)
+
+![Projects List Light](./docs/screenshots/05-projects-list-light.png)
+
+![Projects List Dark](./docs/screenshots/18-projects-list-dark.png)
+
+**Project Management Features:**
+- **🏷️ Project Categorization**: Automatic organization by working directory
+- **📊 Activity Metrics**: Messages, sessions, tokens, and costs per project
+- **🔍 Advanced Filtering**: Search by project, type, date range, and marked conversations
+- **📅 Last Activity**: Real-time timestamps with gRPC updates
+- **💡 Project Insights**: Active session indicators and usage patterns
+
+### **4. 🎯 Session Analysis & Management**
+
+![Active Sessions Light](./docs/screenshots/04-active-sessions-light.png)
+
+![Sessions Overview Light](./docs/screenshots/07-sessions-overview-light.png)
+
+![Sessions Analysis Dark](./docs/screenshots/19-sessions-analysis-dark.png)
+
+**Session Features:**
+- **📊 Session Statistics**: Total sessions, active sessions, average messages per session
+- **⏱️ Real-time Status**: Live "En vivo" indicators for active sessions via gRPC
+- **📈 Activity Rate**: Real-time calculation of session activity percentage
+- **🏆 Session Rankings**: Longest sessions with message counts and project association
+- **⏰ Duration Metrics**: Average, minimum, and maximum session durations
+- **📅 Weekly Patterns**: Activity ranking by day of the week
+
+### **5. 📊 Advanced Analytics Suite**
+
+#### **Messages Analysis - Real-time Token Tracking**
+
+![Messages Analysis Light](./docs/screenshots/10-messages-analysis-light.png)
+
+![Messages Analysis Dark](./docs/screenshots/17-messages-analysis-dark.png)
+
+**Message Analytics:**
+- **📈 Total Messages**: Real-time count with gRPC updates
+- **🎯 Token Distribution**: OpenTelemetry-compliant breakdown (Input/Output/System)
+- **📊 Message Types**: User/Assistant/System distribution with live updates
+- **🏆 Project Rankings**: Top projects by message count with real-time token and cost data
+- **⚡ Activity Periods**: Recent activity breakdown (last hour, 24h, week)
+- **📏 Message Length Analysis**: Short/Medium/Long message categorization
+- **⚡ Performance Metrics**: Response speed, efficiency rate, peak activity times
+
+#### **Projects Analysis - Complete Insights**
+
+![Projects Analysis Light](./docs/screenshots/14-projects-analysis-light.png)
+
+**Project Analytics:**
+- **📋 Comprehensive Ranking**: Activity-based project ranking with detailed metrics
+- **💰 Cost Analysis**: Per-project cost breakdown with percentage distribution
+- **📊 Type Distribution**: Project categorization (Development/Research/Documentation)
+- **🏆 Productivity Metrics**: Messages per session average for each project
+- **⏰ Recent Activity**: Latest activity tracking with real-time updates
+- **📈 Efficiency Scoring**: Project productivity analysis
+
+#### **Costs Analysis - Financial Tracking**
+
+![Costs Analysis Light](./docs/screenshots/15-costs-analysis-light.png)
+
+![Costs Analysis Dark](./docs/screenshots/20-costs-analysis-dark.png)
+
+**Cost Management:**
+- **💰 Total Cost Tracking**: Real-time cost accumulation with gRPC updates
+- **📊 Cost per Session/Message**: Efficiency metrics with live calculations
+- **📈 Monthly Projections**: Predictive cost analysis
+- **🎯 Project Breakdown**: Detailed cost distribution by project with percentages
+- **📊 Cost Trends**: Weekly/Monthly/Yearly cost analysis with growth indicators
+- **💡 Efficiency Rankings**: Most/least cost-efficient projects
+- **💰 Savings Projections**: Optimization recommendations and potential savings
+- **📅 Weekly Cost Distribution**: Daily cost breakdown with pattern analysis
+
+### **6. 🔍 Project Deep Dive & Conversation Exploration**
+
+![Project Details Light](./docs/screenshots/06-project-details-light.png)
+
+**Project Exploration:**
+- **🔍 Session Navigation**: Click any project to explore individual sessions
+- **💬 Conversation Threading**: View complete conversation flows
+- **📊 Session Metrics**: Detailed statistics for each conversation session
+- **⏰ Timeline View**: Chronological conversation progression
+- **🔍 Content Search**: Full-text search within conversations
+
+### 🎯 **Real-time gRPC Features Throughout**
+
+**🔄 Live Data Streaming:**
+- **📡 gRPC Updates**: All statistics update every 5 seconds via gRPC streaming
+- **🎬 Animated Transitions**: Smooth number animations when data changes
+- **⚡ Instant Notifications**: Real-time visual feedback for new activities
+- **📊 Live Charts**: Dynamic chart updates without page refresh
+- **🔔 Activity Indicators**: "En vivo" badges for active sessions
+
+**🎨 Enhanced User Experience:**
+- **🌓 Smart Theme Switching**: Persistent dark/light mode with CSS transitions
+- **📱 Mobile Responsive**: Optimized for all screen sizes with touch-friendly interfaces
+- **⚡ Performance Optimized**: Efficient real-time updates with minimal resource usage
+- **🎯 Visual Hierarchy**: Clear information architecture with intuitive navigation
 
 ### 🎨 **Design & Technology**
 
-- **🎨 TailwindCSS**: Modern, responsive design via CDN
-- **📈 Chart.js**: Interactive, animated charts via CDN
-- **🔄 Auto-Refresh**: Updates every 30 seconds automatically
-- **📱 Responsive**: Mobile-first design that works on all devices
-- **⚡ Real-Time**: Live data from current conversation logs
-
-### 🖥️ **Dashboard Layout**
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  📊 Claude Conversation Logger v2.1.2                  │
-├─────────────────┬─────────────────┬─────────────────────┤
-│  💬 Messages    │  💰 Cost       │  🎯 Tokens         │
-│      352        │    $2.65       │      1.08M          │
-├─────────────────┴─────────────────┴─────────────────────┤
-│  📈 Token Distribution (Interactive Donut Chart)       │
-│    • Cache Read: 822k tokens (76%)                     │
-│    • Cache Creation: 258k tokens (24%)                 │
-│    • Output: 329 tokens (0.03%)                       │
-│    • Input: 86 tokens (0.008%)                        │
-├─────────────────────────────────────────────────────────┤
-│  🏗️ Project Activity (Interactive Bar Chart)           │
-│    • uniCommerce: ████████████████████ 287 msgs       │
-│    • claude-conversation-logger: ████ 65 msgs         │
-├─────────────────────────────────────────────────────────┤
-│  🤖 Model Usage & Cost Analysis                        │
-│    ┌─────────────────────────────────────────────────┐ │
-│    │ Model              │ Tokens  │ Requests │ Cost  │ │
-│    │ Claude Sonnet 4    │ 1.07M   │    32    │$2.65  │ │
-│    │ Claude 3.5 Sonnet  │  3.8k   │     6    │$0.006 │ │
-│    └─────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-### ⚡ **Performance & Updates**
-
-- **🔄 Auto-Refresh**: Page refreshes every 30 seconds
-- **📊 Real-Time Data**: Always shows current statistics
-- **🚀 Fast Loading**: Single HTML page with CDN assets
-- **💾 Direct Access**: Reads statistics directly from MongoDB
-- **📱 Mobile Optimized**: Responsive grid layout
+- **🎨 TailwindCSS**: Modern, responsive design via CDN with custom dark mode
+- **📈 Chart.js**: Interactive, animated charts with real-time data updates
+- **🔄 gRPC Streaming**: Real-time data updates every 5 seconds
+- **📱 Responsive Design**: Mobile-first approach with touch-optimized interactions
+- **⚡ Performance**: Optimized rendering with efficient DOM updates
+- **🎯 Accessibility**: WCAG-compliant design with keyboard navigation support
 
 ### 🛡️ **Security & Access**
 
-- **🌐 Public Endpoint**: No authentication required for dashboard
-- **🔒 Read-Only**: Dashboard only displays data, cannot modify
-- **🎯 Safe Data**: Only shows aggregated statistics, no sensitive content
-- **🏥 Error Handling**: Graceful fallback if data unavailable
+- **🌐 Public Dashboard**: No authentication required for dashboard viewing
+- **🔒 Read-Only Interface**: Dashboard only displays data, cannot modify conversations
+- **🎯 Safe Aggregation**: Shows statistics without exposing sensitive conversation content
+- **🏥 Error Handling**: Graceful fallback when services are unavailable
+- **🔐 API Protection**: Core API endpoints remain protected with API key authentication
 
 ## 🤖 Integrated MCP Server
 
