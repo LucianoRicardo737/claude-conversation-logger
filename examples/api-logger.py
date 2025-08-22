@@ -17,6 +17,7 @@ import json
 import sys
 import requests
 import os
+import time
 from datetime import datetime
 
 # API Configuration
@@ -332,12 +333,43 @@ def main():
         project_name = os.path.basename(cwd)
         transcript_path = input_data.get('transcript_path', '')
         
+        # CRITICAL: Anti-duplication protection
+        # Create a temporary lock file to prevent multiple simultaneous executions
+        lock_file = f"/tmp/api-logger-{session_id}-{hook_event}.lock"
+        
+        # Check if another instance is already processing this exact event
+        if os.path.exists(lock_file):
+            try:
+                # Check if lock is recent (less than 5 seconds old)
+                lock_age = time.time() - os.path.getmtime(lock_file)
+                if lock_age < 5:
+                    sys.exit(0)  # Another instance is handling this, exit silently
+                else:
+                    os.remove(lock_file)  # Stale lock, remove it
+            except:
+                pass
+        
+        # Create lock file
+        try:
+            with open(lock_file, 'w') as f:
+                f.write(f"{os.getpid()}")
+        except:
+            pass  # If we can't create lock, continue anyway
+        
         # Skip if API is not available (fail silently)
         try:
             response = requests.get(f"{API_BASE_URL}/health", timeout=2)
             if response.status_code != 200:
+                try:
+                    os.remove(lock_file)
+                except:
+                    pass
                 sys.exit(0)
         except:
+            try:
+                os.remove(lock_file)
+            except:
+                pass
             sys.exit(0)  # API not available, exit silently
         
         # Handle different hook events
@@ -452,10 +484,19 @@ def main():
                 }
             })
         
-        # Always exit successfully to avoid blocking Claude Code
+        # Clean up lock file and exit successfully
+        try:
+            os.remove(lock_file)
+        except:
+            pass
         sys.exit(0)
         
     except Exception as e:
+        # Clean up lock file on error
+        try:
+            os.remove(lock_file)
+        except:
+            pass
         # Log error but don't interrupt Claude Code
         print(f"API logger error: {e}", file=sys.stderr)
         sys.exit(0)
