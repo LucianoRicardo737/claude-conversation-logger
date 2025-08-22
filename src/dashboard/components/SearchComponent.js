@@ -196,7 +196,7 @@ const SearchComponent = {
                             @focus="onInputFocus"
                             @blur="onInputBlur"
                             type="text"
-                            placeholder="Buscar en conversaciones... (min. 2 caracteres)"
+                            placeholder="Buscar por contenido, descripción, categoría... (min. 2 caracteres)"
                             class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :class="{ 'bg-yellow-50 border-yellow-300': isSearching }"
                         />

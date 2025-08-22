@@ -417,7 +417,22 @@ app.get('/api/conversations/tree', validateApiKey, async (req, res) => {
 
         // Agregación para obtener estructura de árbol
         const pipeline = [
-            { $match: baseQuery },
+            { 
+                $match: {
+                    ...baseQuery,
+                    // Exclude "Session started" messages from tree view
+                    $and: [
+                        { $or: [
+                            { content: { $not: /^Session started/ } },
+                            { content: { $exists: false } }
+                        ]},
+                        { $or: [
+                            { message_type: { $ne: 'system' } },
+                            { message_type: { $exists: false } }
+                        ]}
+                    ]
+                }
+            },
             { $sort: { timestamp: -1 } },
             {
                 $group: {
@@ -457,14 +472,27 @@ app.get('/api/conversations/tree', validateApiKey, async (req, res) => {
 
         const results = await messagesCollection.aggregate(pipeline).toArray();
         
-        // Obtener información de marcadores desde Redis
+        // Obtener información de marcadores y descripciones desde Redis
         const enrichedResults = await Promise.all(results.map(async project => {
             const sessionsWithMarks = await Promise.all(project.sessions.map(async session => {
                 let isMarked = false;
+                let sessionDescription = "Sin descripción";
+                let sessionCategory = "📝 General";
+                
                 if (redisClient?.isOpen) {
                     try {
+                        // Check if marked
                         const markInfo = await redisClient.get(`marked:${session.session_id}`);
                         isMarked = !!markInfo;
+                        
+                        // Get session description
+                        const descKey = `session:desc:${session.session_id}`;
+                        const descInfo = await redisClient.get(descKey);
+                        if (descInfo) {
+                            const descData = JSON.parse(descInfo);
+                            sessionDescription = descData.description || "Sin descripción";
+                            sessionCategory = descData.category || "📝 General";
+                        }
                     } catch (error) {
                         // Ignorar errores de Redis
                     }
@@ -473,6 +501,8 @@ app.get('/api/conversations/tree', validateApiKey, async (req, res) => {
                 return {
                     ...session,
                     is_marked: isMarked,
+                    description: sessionDescription,
+                    category: sessionCategory,
                     recent_messages: session.recent_messages.map(msg => ({
                         id: msg._id,
                         message_type: msg.message_type,
@@ -516,9 +546,22 @@ app.get('/api/conversations/:sessionId', validateApiKey, async (req, res) => {
             return res.status(503).json({ error: 'Database not available' });
         }
 
-        // Obtener todos los mensajes de la sesión
+        // Obtener todos los mensajes de la sesión (excluir "Session started")
         const messages = await messagesCollection
-            .find({ session_id: sessionId })
+            .find({ 
+                session_id: sessionId,
+                // Exclude "Session started" messages from conversation details
+                $and: [
+                    { $or: [
+                        { content: { $not: /^Session started/ } },
+                        { content: { $exists: false } }
+                    ]},
+                    { $or: [
+                        { message_type: { $ne: 'system' } },
+                        { message_type: { $exists: false } }
+                    ]}
+                ]
+            })
             .sort({ timestamp: 1 })
             .toArray();
 
@@ -594,7 +637,19 @@ app.get('/api/search/advanced', validateApiKey, async (req, res) => {
         }
 
         // Construir query de búsqueda
-        const searchQuery = {};
+        const searchQuery = {
+            // Exclude "Session started" messages from search results
+            $and: [
+                { $or: [
+                    { content: { $not: /^Session started/ } },
+                    { content: { $exists: false } }
+                ]},
+                { $or: [
+                    { message_type: { $ne: 'system' } },
+                    { message_type: { $exists: false } }
+                ]}
+            ]
+        };
 
         // Búsqueda de texto
         if (q) {
@@ -776,6 +831,138 @@ app.post('/api/conversations/:sessionId/mark', validateApiKey, async (req, res) 
     }
 });
 
+// Update session description and category
+app.post('/api/sessions/:sessionId/description', validateApiKey, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { description, category, project_name } = req.body;
+
+        if (!description) {
+            return res.status(400).json({ error: 'Description is required' });
+        }
+
+        // Store in Redis for fast access (with 30-day TTL)
+        if (redisClient?.isOpen) {
+            const descriptionData = {
+                session_id: sessionId,
+                description: description.substring(0, 200), // Limit length
+                category: category || "📝 General",
+                project_name: project_name || "unknown",
+                updated_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+            };
+            
+            const key = `session:desc:${sessionId}`;
+            await redisClient.setEx(key, 86400 * 30, JSON.stringify(descriptionData));
+        }
+
+        // Also update in MongoDB if available
+        if (messagesCollection) {
+            try {
+                const updateData = {
+                    session_description: description.substring(0, 200),
+                    session_category: category || "📝 General",
+                    description_updated_at: new Date()
+                };
+
+                // Update all messages in this session with the description
+                await messagesCollection.updateMany(
+                    { session_id: sessionId },
+                    { $set: updateData }
+                );
+
+                console.log(`📝 Updated description for session ${sessionId.substring(0, 8)}: "${description.substring(0, 50)}..."`);
+            } catch (mongoError) {
+                console.warn('⚠️  MongoDB description update failed:', mongoError.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Session description updated successfully',
+            data: {
+                session_id: sessionId,
+                description: description.substring(0, 200),
+                category: category || "📝 General"
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating session description:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get session description
+app.get('/api/sessions/:sessionId/description', validateApiKey, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+
+        // Try Redis first
+        if (redisClient?.isOpen) {
+            try {
+                const key = `session:desc:${sessionId}`;
+                const cached = await redisClient.get(key);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    return res.json({
+                        success: true,
+                        data: data
+                    });
+                }
+            } catch (redisError) {
+                console.warn('⚠️  Redis description read failed:', redisError.message);
+            }
+        }
+
+        // Fallback to MongoDB
+        if (messagesCollection) {
+            try {
+                const message = await messagesCollection.findOne(
+                    { session_id: sessionId, session_description: { $exists: true, $ne: null } },
+                    { 
+                        projection: { 
+                            session_description: 1, 
+                            session_category: 1, 
+                            description_updated_at: 1,
+                            project_name: 1
+                        } 
+                    }
+                );
+
+                if (message) {
+                    return res.json({
+                        success: true,
+                        data: {
+                            session_id: sessionId,
+                            description: message.session_description,
+                            category: message.session_category || "📝 General",
+                            project_name: message.project_name,
+                            updated_at: message.description_updated_at
+                        }
+                    });
+                }
+            } catch (mongoError) {
+                console.warn('❌ MongoDB description read failed:', mongoError.message);
+            }
+        }
+
+        // No description found
+        res.json({
+            success: true,
+            data: {
+                session_id: sessionId,
+                description: "Sin descripción",
+                category: "📝 General"
+            }
+        });
+
+    } catch (error) {
+        console.error('Error getting session description:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Export conversation in different formats
 app.get('/api/conversations/:sessionId/export', validateApiKey, async (req, res) => {
     try {
@@ -786,9 +973,22 @@ app.get('/api/conversations/:sessionId/export', validateApiKey, async (req, res)
             return res.status(503).json({ error: 'Database not available' });
         }
 
-        // Obtener todos los mensajes de la sesión
+        // Obtener todos los mensajes de la sesión (excluir "Session started")
         const messages = await messagesCollection
-            .find({ session_id: sessionId })
+            .find({ 
+                session_id: sessionId,
+                // Exclude "Session started" messages from conversation details
+                $and: [
+                    { $or: [
+                        { content: { $not: /^Session started/ } },
+                        { content: { $exists: false } }
+                    ]},
+                    { $or: [
+                        { message_type: { $ne: 'system' } },
+                        { message_type: { $exists: false } }
+                    ]}
+                ]
+            })
             .sort({ timestamp: 1 })
             .toArray();
 
@@ -917,8 +1117,20 @@ async function getDashboardStats() {
     // Get from MongoDB
     try {
         if (messagesCollection) {
-            // Get all messages for comprehensive stats
-            const allMessages = await messagesCollection.find({}).toArray();
+            // Get all messages for comprehensive stats (exclude "Session started")
+            const allMessages = await messagesCollection.find({
+                // Exclude "Session started" messages from dashboard stats
+                $and: [
+                    { $or: [
+                        { content: { $not: /^Session started/ } },
+                        { content: { $exists: false } }
+                    ]},
+                    { $or: [
+                        { message_type: { $ne: 'system' } },
+                        { message_type: { $exists: false } }
+                    ]}
+                ]
+            }).toArray();
             
             stats.messageCount = allMessages.length;
             stats.tokenMetrics = allMessages.filter(msg => msg.message_type === 'token_metric');
@@ -1074,6 +1286,15 @@ async function initializeMongoDB() {
         await messagesCollection.createIndex({ timestamp: -1 });
         await messagesCollection.createIndex({ project_name: 1, timestamp: -1 });
         await messagesCollection.createIndex({ session_id: 1 });
+        await messagesCollection.createIndex({ session_description: 1 });
+        await messagesCollection.createIndex({ session_category: 1 });
+        await messagesCollection.createIndex({ 
+            session_description: "text", 
+            content: "text", 
+            project_name: "text" 
+        }, { 
+            name: "search_text_index" 
+        });
         
         // Optional TTL configuration - by default, data persists indefinitely
         const ttlSeconds = process.env.MONGODB_TTL_SECONDS;
@@ -1701,9 +1922,21 @@ app.get('/dashboard/legacy/projects', async (req, res) => {
 async function loadInitialDataToMemory() {
     try {
         if (messagesCollection) {
-            // Load recent messages (last 500) to memory for fast dashboard access
+            // Load recent messages (last 500) to memory for fast dashboard access (exclude "Session started")
             const recentMessages = await messagesCollection
-                .find({})
+                .find({
+                    // Exclude "Session started" messages from memory cache
+                    $and: [
+                        { $or: [
+                            { content: { $not: /^Session started/ } },
+                            { content: { $exists: false } }
+                        ]},
+                        { $or: [
+                            { message_type: { $ne: 'system' } },
+                            { message_type: { $exists: false } }
+                        ]}
+                    ]
+                })
                 .sort({ timestamp: -1 })
                 .limit(500)
                 .toArray();

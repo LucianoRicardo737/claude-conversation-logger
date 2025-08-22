@@ -122,6 +122,29 @@ const apiService = {
             console.error('Error exporting conversation:', error);
             throw error;
         }
+    },
+
+    async getSessionDescription(sessionId) {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/sessions/${sessionId}/description`);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting session description:', error);
+            throw error;
+        }
+    },
+
+    async updateSessionDescription(sessionId, description, category) {
+        try {
+            const response = await axios.post(`${API_BASE_URL}/api/sessions/${sessionId}/description`, {
+                description,
+                category
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error updating session description:', error);
+            throw error;
+        }
     }
 };
 
@@ -172,6 +195,8 @@ const Dashboard = {
             const query = this.store.sessionSearchQuery.toLowerCase();
             return sessions.filter(session => {
                 return session.short_id.toLowerCase().includes(query) ||
+                       (session.description && session.description.toLowerCase().includes(query)) ||
+                       (session.category && session.category.toLowerCase().includes(query)) ||
                        (session.recent_messages && session.recent_messages.some(msg => 
                            msg.content.toLowerCase().includes(query)
                        ));
@@ -1725,6 +1750,20 @@ const Dashboard = {
                                                     <i :class="session.is_marked ? 'fas fa-star' : 'far fa-star'"></i>
                                                 </button>
                                             </div>
+                                            
+                                            <!-- Session Description and Category -->
+                                            <div class="mb-2">
+                                                <div class="flex items-start space-x-2">
+                                                    <span v-if="session.category && session.category !== '📝 General'" 
+                                                          class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 flex-shrink-0 font-medium">
+                                                        {{ session.category }}
+                                                    </span>
+                                                    <p class="text-sm text-gray-900 font-medium flex-1 leading-tight">
+                                                        {{ session.description && session.description !== 'Sin descripción' ? session.description : 'Sin descripción disponible' }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
                                             <div class="text-xs text-gray-600 mb-1 flex items-center space-x-3">
                                                 <span><i class="fas fa-comment mr-1"></i>{{ session.message_count }} mensajes</span>
                                                 <span><i class="fas fa-microchip text-purple-500 mr-1"></i>{{ formatTokens(calculateTokens(session.message_count)) }}</span>

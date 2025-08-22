@@ -103,6 +103,136 @@ def estimate_cost_usd(usage_data, model):
     
     return round(total_cost, 6)  # Round to 6 decimal places
 
+def extract_session_description(content, max_length=80):
+    """Extract a meaningful description from the first user message"""
+    if not content or not isinstance(content, str):
+        return "Sin descripción"
+    
+    # Clean the content
+    content = content.strip()
+    
+    # Remove common prefixes
+    prefixes_to_remove = [
+        "necesito", "quiero", "puedes", "ayuda", "ayúdame", 
+        "me puedes", "podrías", "quisiera", "tengo que",
+        "hola", "buenas", "good", "hello"
+    ]
+    
+    content_lower = content.lower()
+    for prefix in prefixes_to_remove:
+        if content_lower.startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    
+    # Remove question marks and exclamations from start
+    content = content.lstrip('¿?¡!')
+    
+    # Truncate to max length preserving word boundaries
+    if len(content) <= max_length:
+        return content.capitalize()
+    
+    # Find last space before max_length
+    truncated = content[:max_length]
+    last_space = truncated.rfind(' ')
+    
+    if last_space > max_length * 0.7:  # Only cut at word boundary if it's not too short
+        truncated = content[:last_space]
+    
+    return (truncated + "...").capitalize()
+
+def categorize_message(content):
+    """Automatically categorize a message based on keywords"""
+    if not content or not isinstance(content, str):
+        return "📝 General"
+    
+    content_lower = content.lower()
+    
+    # Define categories with their keywords
+    categories = {
+        "🐛 Bug Fix": [
+            "error", "fix", "bug", "problema", "falla", "fail", "reparar", 
+            "corregir", "solucionar", "rompe", "broken", "issue"
+        ],
+        "✨ Feature": [
+            "agregar", "nueva", "nuevo", "implementar", "crear", "add", "create",
+            "feature", "funcionalidad", "añadir", "develop", "build"
+        ],
+        "🔧 Config": [
+            "configurar", "config", "setup", "instalar", "install", "docker",
+            "environment", "env", "variable", "setting", "deploy"
+        ],
+        "📚 Docs": [
+            "documentación", "docs", "readme", "explicar", "explain", 
+            "documentation", "comment", "comentario", "describe"
+        ],
+        "🎨 UI/UX": [
+            "diseño", "design", "frontend", "css", "style", "componente", 
+            "component", "interfaz", "ui", "ux", "visual", "theme"
+        ],
+        "🔄 Refactor": [
+            "refactorizar", "refactor", "mejorar", "improve", "optimizar", 
+            "optimize", "clean", "restructure", "reorganize"
+        ],
+        "🔍 Debug": [
+            "debug", "debuggear", "investigate", "investigar", "analizar", 
+            "analyze", "check", "revisar", "trace", "log"
+        ],
+        "🗄️ Database": [
+            "database", "db", "mongo", "sql", "query", "tabla", "collection",
+            "schema", "migration", "datos", "data"
+        ],
+        "🔐 Security": [
+            "security", "auth", "authentication", "authorization", "login",
+            "seguridad", "permisos", "permissions", "token", "oauth"
+        ],
+        "🚀 Deploy": [
+            "deploy", "deployment", "production", "prod", "release", 
+            "kubernetes", "k8s", "staging", "publish"
+        ]
+    }
+    
+    # Count matches for each category
+    category_scores = {}
+    for category, keywords in categories.items():
+        score = sum(1 for keyword in keywords if keyword in content_lower)
+        if score > 0:
+            category_scores[category] = score
+    
+    # Return the category with highest score, or default
+    if category_scores:
+        return max(category_scores, key=category_scores.get)
+    
+    return "📝 General"
+
+def send_session_description_update(session_id, project_name, description, category):
+    """Send session description update to the API"""
+    try:
+        url = f"{API_BASE_URL}/api/sessions/{session_id}/description"
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': API_KEY
+        }
+        
+        data = {
+            'session_id': session_id,
+            'project_name': project_name,
+            'description': description,
+            'category': category,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        response = requests.post(url, json=data, headers=headers, timeout=5)
+        
+        if response.status_code in [200, 201, 202]:
+            return True
+        else:
+            print(f"Description update failed: {response.status_code}", file=sys.stderr)
+            return False
+            
+    except Exception as e:
+        print(f"Description update error: {e}", file=sys.stderr)
+        return False
+
 def parse_transcript_for_last_assistant_message(transcript_path):
     """Parse transcript to extract the last assistant message with improved token parsing"""
     
@@ -260,6 +390,8 @@ def main():
             
         elif hook_event == 'UserPromptSubmit':
             prompt = input_data.get('prompt', '[prompt not captured]')
+            
+            # Send the user message
             send_to_api('log', {
                 'session_id': session_id,
                 'project_name': project_name,
@@ -270,6 +402,15 @@ def main():
                     'source': 'user_prompt_hook'
                 }
             })
+            
+            # Check if this might be the first user message in the session
+            # We'll try to extract description and category
+            if prompt and len(prompt.strip()) > 10:  # Only process meaningful messages
+                description = extract_session_description(prompt)
+                category = categorize_message(prompt)
+                
+                # Send description update (this will create or update the session description)
+                send_session_description_update(session_id, project_name, description, category)
             
         elif hook_event == 'PostToolUse':
             tool_name = input_data.get('tool_name', 'unknown')
