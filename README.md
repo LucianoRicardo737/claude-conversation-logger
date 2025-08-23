@@ -186,11 +186,14 @@ X-API-Key: claude_api_secret_2024_change_me
 # Get conversations with filters
 GET /api/conversations?project=uniCommerce&limit=10&days=7
 
-# 🚀 Smart search conversations (dual-layer)
-GET /api/search?q=payment&days=7&deep=false&project=uniCommerce
+# 🚀 Smart search conversations (dual-layer + tool filtering)
+GET /api/search?q=payment&days=7&project=uniCommerce&include_tools=false
 
 # 🗄️ Deep historical search (MongoDB only)
-GET /api/search/deep?q=authentication&days=90&project=uniCommerce&message_type=tool
+GET /api/search/deep?q=authentication&days=90&project=uniCommerce&include_tools=true
+
+# 🔧 Search for tool usage (find edited files)
+GET /api/search?q=Edit:server.js&include_tools=true
 
 # Export conversation
 GET /api/conversations/{session_id}/export?format=json
@@ -270,38 +273,44 @@ GET /api/db/ping
 
 ### **🚀 Smart Search Strategy**
 
-The MCP server now implements a **dual-layer search architecture** for optimal performance:
+The MCP server implements a **dual-layer architecture with intelligent filtering** for optimal conversation context:
 
 - **⚡ Fast Layer (Redis)**: Recent conversations (< 30 days) - Sub-100ms response
 - **🗄️ Deep Layer (MongoDB)**: Complete historical data (unlimited) - Sub-500ms response  
-- **🤖 Auto-Selection**: Automatically chooses optimal strategy based on parameters
+- **🤖 Smart Filtering**: MCP excludes tool noise by default, includes when needed
+- **🔧 Flexible Control**: `include_tools` parameter for finding edited files or tool usage
 
 ### **Enhanced MCP Tools**
 
-| Tool | Purpose | New Features | Performance |
+| Tool | Purpose | Smart Features | Performance |
 |------|---------|--------------|-------------|
-| `search_conversations` | **Smart dual-layer search** | `deep`, `project` parameters | ⚡ Redis → 🗄️ MongoDB |
-| `get_recent_conversations` | Get latest activity (Redis-optimized) | Faster Redis-first queries | < 50ms |
-| `analyze_conversation_patterns` | **Auto-deep for historical analysis** | Auto MongoDB for > 14 days | Intelligent routing |
+| `search_conversations` | **Conversation-focused search** | `include_tools=false`, `deep`, `project` | ⚡ Redis → 🗄️ MongoDB |
+| `get_recent_conversations` | Latest activity (no tool noise) | Redis-optimized + tool filtering | < 50ms |
+| `analyze_conversation_patterns` | **Clean conversation analysis** | Auto-excludes tools, MongoDB > 14 days | Intelligent routing |
 | `export_conversation` | Export session data | Enhanced metadata | Full history access |
 
 ### **🔧 Smart Search Examples**
 
 ```javascript
-// ⚡ Fast search (Redis + MongoDB fallback)
+// 💬 Default MCP search (conversations only - no tool noise)
 search_conversations({
   query: "authentication error",
-  days: 7,
-  deep: false,  // Default: fast search
-  project: "uniCommerce"
+  days: 7
+  // include_tools: false by default for MCP
 })
 
-// 🗄️ Deep historical search (MongoDB only)
+// 🔧 Search for edited files or tool usage
+search_conversations({
+  query: "Edit: server.js",
+  include_tools: true  // Include tool messages when needed
+})
+
+// 🗄️ Deep historical analysis (MongoDB + smart filtering)
 search_conversations({
   query: "payment integration", 
   days: 90,
-  deep: true,   // Force complete history search
-  include_resolved: false
+  deep: true,
+  include_tools: false  // Clean conversation analysis
 })
 ```
 
@@ -647,6 +656,10 @@ LOG_LEVEL=info
 REDIS_MESSAGE_LIMIT=10000
 MONGODB_POOL_SIZE=20
 GRPC_MAX_CONNECTIONS=100
+
+# Optional smart filtering (affects API behavior)
+INCLUDE_TOOLS_IN_SEARCH=true    # Include tool messages in API searches (default)
+# INCLUDE_TOOLS_IN_SEARCH=false  # Exclude tool messages from API searches
 ```
 
 #### **Production docker-compose.yml**
@@ -1057,11 +1070,12 @@ npm run dev
 
 **🚀 Latest Updates (v2.2.0):**
 - ✅ **Dual-Layer Search Architecture** - Smart Redis + MongoDB routing
-- ✅ **Enhanced MCP Tools** - `deep` parameter for historical searches  
+- ✅ **Smart Tool Filtering** - MCP excludes noise, API flexible
+- ✅ **Enhanced MCP Tools** - `include_tools` parameter for when needed
 - ✅ **Performance Optimized** - Sub-100ms fast queries, Sub-500ms deep queries
 - ✅ **Memory Optimized** - Eliminated temporary storage, -512MB RAM usage
 - ✅ **New Deep Search API** - `/api/search/deep` for comprehensive historical queries
-- ✅ **Auto-Intelligence** - Automatic selection of optimal search strategy
+- ✅ **Differentiated Defaults** - Clean MCP searches, full API functionality
 
 ---
 
@@ -1073,11 +1087,13 @@ npm run dev
 ✅ **Monolithic Docker container with all services**  
 ✅ **🚀 Dual-layer MCP architecture (Redis + MongoDB)**  
 ✅ **⚡ Smart search with sub-100ms performance**  
+✅ **🎯 Intelligent tool filtering (MCP clean, API flexible)**  
 ✅ **🗄️ Deep historical search capabilities**  
+✅ **🔧 Context-aware searches (conversations vs tools)**  
 ✅ **Export capabilities (JSON/Markdown)**  
 ✅ **Production-ready deployment**  
-✅ **🤖 Enhanced MCP tools with intelligent routing**  
+✅ **🤖 Enhanced MCP tools with smart defaults**  
 ✅ **Memory and performance optimized**  
 ✅ **Comprehensive API documentation**
 
-**🚀 Ready for immediate deployment with optimized dual-layer search architecture!**
+**🚀 Ready for immediate deployment with intelligent conversation-focused architecture!**
