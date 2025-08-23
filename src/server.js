@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 // Configuration constants
 const REDIS_MESSAGE_LIMIT = parseInt(process.env.REDIS_MESSAGE_LIMIT) || 5000;
+const INCLUDE_TOOLS_IN_SEARCH = process.env.INCLUDE_TOOLS_IN_SEARCH !== 'false'; // Default true for API
 
 // Redis connection
 const redisClient = Redis.createClient({
@@ -302,7 +303,7 @@ async function getMessagesFromStorage(limit = 10, project = null, session = null
 }
 
 // Helper function to search in Redis (fast, recent messages)
-async function searchInRedis(query, days = 7, limit = 10) {
+async function searchInRedis(query, days = 7, limit = 10, includeTools = INCLUDE_TOOLS_IN_SEARCH) {
     let messages = [];
     
     try {
@@ -325,6 +326,14 @@ async function searchInRedis(query, days = 7, limit = 10) {
         new Date(msg.timestamp || msg.created_at) > cutoffDate
     );
     
+    // Filter tool messages if requested
+    if (!includeTools) {
+        messages = messages.filter(msg => 
+            msg.message_type !== 'tool' && 
+            msg.hook_event !== 'PostToolUse'
+        );
+    }
+    
     // Search in content and project name
     if (query) {
         const searchTerm = query.toLowerCase();
@@ -344,7 +353,7 @@ async function searchInRedis(query, days = 7, limit = 10) {
 }
 
 // Helper function to search in MongoDB (deep, historical search)
-async function searchInMongoDB(query, days = 30, limit = 50, project = null) {
+async function searchInMongoDB(query, days = 30, limit = 50, project = null, includeTools = INCLUDE_TOOLS_IN_SEARCH) {
     let messages = [];
     
     try {
@@ -361,6 +370,11 @@ async function searchInMongoDB(query, days = 30, limit = 50, project = null) {
                 const cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - days);
                 mongoQuery.timestamp = { $gte: cutoffDate };
+            }
+            
+            // Message type filter
+            if (!includeTools) {
+                mongoQuery.message_type = { $ne: 'tool' };
             }
             
             // Text search
@@ -431,21 +445,29 @@ app.get('/api/search', validateApiKey, async (req, res) => {
         const deep = req.query.deep === 'true' || req.query.deep === true;
         const project = req.query.project;
 
+        // Check for explicit include_tools parameter, otherwise use environment default
+        let includeTools = INCLUDE_TOOLS_IN_SEARCH; // Default from env
+        if (req.query.include_tools === 'true') {
+            includeTools = true;
+        } else if (req.query.include_tools === 'false') {
+            includeTools = false;
+        }
+
         let messages = [];
         
         // Choose search strategy based on parameters
         if (deep || days > 30) {
             // Deep search in MongoDB for historical data
-            messages = await searchInMongoDB(query, days, limit * 2, project);
+            messages = await searchInMongoDB(query, days, limit * 2, project, includeTools);
             console.log(`🔍 Deep search completed: ${messages.length} results from MongoDB`);
         } else {
             // Fast search in Redis for recent data
-            messages = await searchInRedis(query, days, limit * 2);
+            messages = await searchInRedis(query, days, limit * 2, includeTools);
             
             // Fallback to MongoDB if Redis has insufficient results
             if (messages.length < limit && query) {
                 console.log(`⚡ Redis search returned ${messages.length} results, trying MongoDB fallback...`);
-                const mongoResults = await searchInMongoDB(query, days, limit, project);
+                const mongoResults = await searchInMongoDB(query, days, limit, project, includeTools);
                 
                 // Merge results and remove duplicates
                 const combinedMessages = [...messages];
@@ -471,6 +493,7 @@ app.get('/api/search', validateApiKey, async (req, res) => {
             query,
             days,
             deep,
+            include_tools: includeTools,
             count: messages.length,
             source: deep || days > 30 ? 'mongodb' : 'redis+mongodb',
             messages: messages.map(msg => ({
@@ -505,6 +528,14 @@ app.get('/api/search/deep', validateApiKey, async (req, res) => {
         const session = req.query.session;
         const messageType = req.query.message_type;
 
+        // Check for explicit include_tools parameter, otherwise use environment default
+        let includeTools = INCLUDE_TOOLS_IN_SEARCH; // Default from env
+        if (req.query.include_tools === 'true') {
+            includeTools = true;
+        } else if (req.query.include_tools === 'false') {
+            includeTools = false;
+        }
+
         if (!messagesCollection) {
             return res.status(503).json({ 
                 error: 'MongoDB not available for deep search',
@@ -537,6 +568,11 @@ app.get('/api/search/deep', validateApiKey, async (req, res) => {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - days);
             mongoQuery.timestamp = { $gte: cutoffDate };
+        }
+        
+        // Message type filter
+        if (!includeTools) {
+            mongoQuery.message_type = { $ne: 'tool' };
         }
         
         // Text search with comprehensive fields
@@ -601,6 +637,7 @@ app.get('/api/search/deep', validateApiKey, async (req, res) => {
             project,
             session,
             message_type: messageType,
+            include_tools: includeTools,
             count: messages.length,
             sessions_found: Object.keys(sessionGroups).length,
             source: 'mongodb_deep',

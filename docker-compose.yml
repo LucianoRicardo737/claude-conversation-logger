@@ -24,6 +24,9 @@ services:
       # - REDIS_MESSAGE_LIMIT=5000     # 5000 messages (default)
       # - REDIS_MESSAGE_LIMIT=10000    # 10000 messages (more cache)
       # - REDIS_MESSAGE_LIMIT=1000     # 1000 messages (less memory)
+      # Optional: Include tool messages in API search results (default: true)
+      # - INCLUDE_TOOLS_IN_SEARCH=true    # Include all messages in API searches (default)
+      # - INCLUDE_TOOLS_IN_SEARCH=false   # Exclude tool messages from API searches
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
       interval: 30s

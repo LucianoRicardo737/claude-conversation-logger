@@ -106,6 +106,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Force deep search in MongoDB (slower but complete historical data). Default: false",
               default: false
             },
+            include_tools: {
+              type: "boolean",
+              description: "Include tool messages (Read, Edit, Bash, etc.) in results. Useful for finding edited files or tool usage patterns. Default: false for MCP",
+              default: false
+            },
             include_resolved: {
               type: "boolean",
               description: "Include already resolved conversations (default: false)",
@@ -188,7 +193,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (request.params.name) {
     case "search_conversations":
       try {
-        const { query, days = 7, deep = false, include_resolved = false, limit = 10, project } = request.params.arguments;
+        const { query, days = 7, deep = false, include_tools = false, include_resolved = false, limit = 10, project } = request.params.arguments;
         
         // Choose endpoint based on deep parameter
         const endpoint = deep ? 'search/deep' : 'search';
@@ -198,7 +203,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           q: query,
           days: days.toString(),
           limit: (limit * 2).toString(), // Get more to filter
-          deep: deep.toString()
+          deep: deep.toString(),
+          include_tools: include_tools.toString()  // Pass the preference
         });
 
         if (project) {
@@ -225,14 +231,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Build response with search strategy info
         const searchStrategy = deep ? '🗄️ Deep MongoDB' : days > 30 ? '🗄️ MongoDB' : '⚡ Redis+MongoDB';
+        const searchMode = include_tools ? '🔧 Including Tools' : '💬 Conversations Only';
         const resultSource = results.source || (deep ? 'mongodb_deep' : 'smart');
         
         return {
           content: [
             {
               type: "text",
-              text: `🔍 **Search Results** (${searchStrategy})\n` +
-                `Query: "${query}" | Days: ${days} | Project: ${project || 'all'} | Deep: ${deep}\n` +
+              text: `🔍 **Search Results** (${searchStrategy} | ${searchMode})\n` +
+                `Query: "${query}" | Days: ${days} | Project: ${project || 'all'} | Deep: ${deep} | Tools: ${include_tools}\n` +
                 `Found: ${filteredResults.length} conversations | Source: ${resultSource}\n\n` +
                 filteredResults.map((msg, i) => 
                   `**${i + 1}. ${msg.project_name}** (${new Date(msg.created_at || msg.timestamp).toLocaleString()})\n` +
@@ -253,10 +260,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case "get_recent_conversations":
       try {
-        const { hours = 24, project, limit = 5 } = request.params.arguments;
+        const { hours = 24, project, limit = 5, include_tools = false } = request.params.arguments;
         
         const params = new URLSearchParams({
-          limit: limit.toString()
+          limit: limit.toString(),
+          include_tools: include_tools.toString()  // Pass the preference
         });
         
         if (project) params.set('project', project);
@@ -300,7 +308,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case "analyze_conversation_patterns":
       try {
-        const { days = 7, project } = request.params.arguments;
+        const { days = 7, project, include_tools = false } = request.params.arguments;
         
         // Use deep search for comprehensive analysis when analyzing > 14 days
         const useDeepSearch = days > 14;
@@ -308,7 +316,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         const params = new URLSearchParams({
           days: days.toString(),
-          limit: useDeepSearch ? '200' : '100' // More data for deep analysis
+          limit: useDeepSearch ? '200' : '100', // More data for deep analysis
+          include_tools: include_tools.toString()  // Pass the preference
         });
         
         if (project) params.set('project', project);
