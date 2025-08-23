@@ -301,6 +301,99 @@ async function getMessagesFromStorage(limit = 10, project = null, session = null
     return [];
 }
 
+// Helper function to search in Redis (fast, recent messages)
+async function searchInRedis(query, days = 7, limit = 10) {
+    let messages = [];
+    
+    try {
+        if (redisClient.isOpen) {
+            // Get recent messages from Redis
+            const redisMessages = await redisClient.lRange('messages:recent', 0, -1);
+            messages = redisMessages.map(msg => JSON.parse(msg));
+            console.log(`⚡ Retrieved ${messages.length} messages from Redis for search`);
+        }
+    } catch (error) {
+        console.warn('⚠️  Redis search failed:', error.message);
+        return [];
+    }
+    
+    // Filter by time
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    messages = messages.filter(msg => 
+        new Date(msg.timestamp || msg.created_at) > cutoffDate
+    );
+    
+    // Search in content and project name
+    if (query) {
+        const searchTerm = query.toLowerCase();
+        messages = messages.filter(msg => 
+            (msg.content || '').toLowerCase().includes(searchTerm) ||
+            (msg.project_name || '').toLowerCase().includes(searchTerm) ||
+            (msg.session_id || '').toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    // Sort by relevance and limit
+    messages = messages
+        .sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at))
+        .slice(0, limit);
+    
+    return messages;
+}
+
+// Helper function to search in MongoDB (deep, historical search)
+async function searchInMongoDB(query, days = 30, limit = 50, project = null) {
+    let messages = [];
+    
+    try {
+        if (messagesCollection) {
+            // Build MongoDB query
+            const mongoQuery = {};
+            
+            if (project) {
+                mongoQuery.project_name = project;
+            }
+            
+            // Time filter
+            if (days) {
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - days);
+                mongoQuery.timestamp = { $gte: cutoffDate };
+            }
+            
+            // Text search
+            if (query) {
+                mongoQuery.$or = [
+                    { content: { $regex: query, $options: 'i' } },
+                    { project_name: { $regex: query, $options: 'i' } },
+                    { session_id: { $regex: query, $options: 'i' } }
+                ];
+            }
+            
+            const mongoMessages = await messagesCollection
+                .find(mongoQuery)
+                .sort({ timestamp: -1 })
+                .limit(limit)
+                .toArray();
+            
+            messages = mongoMessages.map(msg => ({
+                ...msg,
+                timestamp: msg.timestamp.toISOString(),
+                created_at: msg.created_at.toISOString()
+            }));
+            
+            console.log(`💾 Retrieved ${messages.length} messages from MongoDB deep search`);
+        }
+    } catch (error) {
+        console.warn('❌ MongoDB search failed:', error.message);
+        return [];
+    }
+    
+    return messages;
+}
+
 // Get recent messages API endpoint
 app.get('/api/messages', validateApiKey, async (req, res) => {
     try {
@@ -329,63 +422,212 @@ app.get('/api/messages', validateApiKey, async (req, res) => {
     }
 });
 
-// Search messages
+// Smart search messages - dual layer (Redis + MongoDB)
 app.get('/api/search', validateApiKey, async (req, res) => {
     try {
         const query = req.query.q || '';
         const days = parseInt(req.query.days) || 7;
         const limit = parseInt(req.query.limit) || 10;
+        const deep = req.query.deep === 'true' || req.query.deep === true;
+        const project = req.query.project;
 
-        let messages = [...inMemoryMessages];
-
-        // Try Redis if memory is empty
-        if (messages.length === 0) {
-            try {
-                if (redisClient.isOpen) {
-                    const redisMessages = await redisClient.lRange('messages', 0, 999);
-                    messages = redisMessages.map(msg => JSON.parse(msg));
-                }
-            } catch (error) {
-                console.warn('Redis read failed:', error.message);
+        let messages = [];
+        
+        // Choose search strategy based on parameters
+        if (deep || days > 30) {
+            // Deep search in MongoDB for historical data
+            messages = await searchInMongoDB(query, days, limit * 2, project);
+            console.log(`🔍 Deep search completed: ${messages.length} results from MongoDB`);
+        } else {
+            // Fast search in Redis for recent data
+            messages = await searchInRedis(query, days, limit * 2);
+            
+            // Fallback to MongoDB if Redis has insufficient results
+            if (messages.length < limit && query) {
+                console.log(`⚡ Redis search returned ${messages.length} results, trying MongoDB fallback...`);
+                const mongoResults = await searchInMongoDB(query, days, limit, project);
+                
+                // Merge results and remove duplicates
+                const combinedMessages = [...messages];
+                const existingIds = new Set(messages.map(m => m.id || m._id));
+                
+                mongoResults.forEach(msg => {
+                    if (!existingIds.has(msg.id || msg._id)) {
+                        combinedMessages.push(msg);
+                    }
+                });
+                
+                messages = combinedMessages;
+                console.log(`🔄 Combined search: ${messages.length} total results`);
             }
         }
 
-        // Filter by time
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - days);
-
-        messages = messages.filter(msg => 
-            new Date(msg.timestamp) > cutoffDate
-        );
-
-        // Search in content and project name
-        if (query) {
-            const searchTerm = query.toLowerCase();
-            messages = messages.filter(msg => 
-                msg.content.toLowerCase().includes(searchTerm) ||
-                msg.project_name.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        // Sort by relevance and limit
+        // Final sort and limit
         messages = messages
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at))
             .slice(0, limit);
 
         res.json({
             query,
+            days,
+            deep,
             count: messages.length,
+            source: deep || days > 30 ? 'mongodb' : 'redis+mongodb',
             messages: messages.map(msg => ({
-                session_id: msg.session_id.substring(0, 8) + '...',
+                id: msg.id || msg._id,
+                session_id: (msg.session_id || '').substring(0, 12) + '...',
                 project_name: msg.project_name,
-                content: msg.content.substring(0, 300) + (msg.content.length > 300 ? '...' : ''),
-                timestamp: msg.timestamp,
-                created_at: msg.created_at
+                content: (msg.content || '').substring(0, 300) + (msg.content && msg.content.length > 300 ? '...' : ''),
+                timestamp: msg.timestamp || msg.created_at,
+                created_at: msg.created_at || msg.timestamp,
+                message_type: msg.message_type,
+                hook_event: msg.hook_event
             }))
         });
     } catch (error) {
-        console.error('Error searching messages:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error in smart search:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            query,
+            count: 0,
+            messages: []
+        });
+    }
+});
+
+// Deep search endpoint - MongoDB only, for comprehensive historical search
+app.get('/api/search/deep', validateApiKey, async (req, res) => {
+    try {
+        const query = req.query.q || '';
+        const days = parseInt(req.query.days) || 90; // Default to 90 days for deep search
+        const limit = parseInt(req.query.limit) || 50; // Higher limit for deep search
+        const project = req.query.project;
+        const session = req.query.session;
+        const messageType = req.query.message_type;
+
+        if (!messagesCollection) {
+            return res.status(503).json({ 
+                error: 'MongoDB not available for deep search',
+                query,
+                count: 0,
+                messages: []
+            });
+        }
+
+        // Build comprehensive MongoDB query
+        const mongoQuery = {};
+        
+        // Project filter
+        if (project) {
+            mongoQuery.project_name = project;
+        }
+        
+        // Session filter
+        if (session) {
+            mongoQuery.session_id = { $regex: session, $options: 'i' };
+        }
+        
+        // Message type filter
+        if (messageType) {
+            mongoQuery.message_type = messageType;
+        }
+        
+        // Time filter
+        if (days && days > 0) {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+            mongoQuery.timestamp = { $gte: cutoffDate };
+        }
+        
+        // Text search with comprehensive fields
+        if (query) {
+            const searchRegex = { $regex: query, $options: 'i' };
+            mongoQuery.$or = [
+                { content: searchRegex },
+                { project_name: searchRegex },
+                { session_id: searchRegex },
+                { hook_event: searchRegex },
+                { 'metadata.source': searchRegex },
+                { 'metadata.model': searchRegex }
+            ];
+        }
+        
+        console.log(`🔍 Deep search query:`, JSON.stringify(mongoQuery, null, 2));
+        
+        // Execute MongoDB search with comprehensive sorting
+        const mongoMessages = await messagesCollection
+            .find(mongoQuery)
+            .sort({ timestamp: -1 })
+            .limit(limit)
+            .toArray();
+        
+        const messages = mongoMessages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp.toISOString(),
+            created_at: msg.created_at.toISOString()
+        }));
+        
+        console.log(`💾 Deep search completed: ${messages.length} results from MongoDB`);
+        
+        // Group results by session for better organization
+        const sessionGroups = {};
+        messages.forEach(msg => {
+            const sessionKey = msg.session_id;
+            if (!sessionGroups[sessionKey]) {
+                sessionGroups[sessionKey] = {
+                    session_id: sessionKey,
+                    project_name: msg.project_name,
+                    messages: [],
+                    first_message: msg.timestamp,
+                    last_message: msg.timestamp,
+                    total_messages: 0
+                };
+            }
+            sessionGroups[sessionKey].messages.push(msg);
+            sessionGroups[sessionKey].total_messages++;
+            
+            // Update time range
+            if (msg.timestamp < sessionGroups[sessionKey].first_message) {
+                sessionGroups[sessionKey].first_message = msg.timestamp;
+            }
+            if (msg.timestamp > sessionGroups[sessionKey].last_message) {
+                sessionGroups[sessionKey].last_message = msg.timestamp;
+            }
+        });
+
+        res.json({
+            query,
+            days,
+            project,
+            session,
+            message_type: messageType,
+            count: messages.length,
+            sessions_found: Object.keys(sessionGroups).length,
+            source: 'mongodb_deep',
+            messages: messages.map(msg => ({
+                id: msg.id || msg._id,
+                session_id: msg.session_id,
+                project_name: msg.project_name,
+                content: msg.content,
+                timestamp: msg.timestamp,
+                created_at: msg.created_at,
+                message_type: msg.message_type,
+                hook_event: msg.hook_event,
+                metadata: msg.metadata
+            })),
+            session_groups: Object.values(sessionGroups).sort((a, b) => 
+                new Date(b.last_message) - new Date(a.last_message)
+            )
+        });
+    } catch (error) {
+        console.error('Error in deep search:', error);
+        res.status(500).json({ 
+            error: 'Deep search failed',
+            details: error.message,
+            query: req.query.q || '',
+            count: 0,
+            messages: []
+        });
     }
 });
 
@@ -1213,8 +1455,9 @@ app.get('/api/token-stats', validateApiKey, async (req, res) => {
         const days = parseInt(req.query.days) || 7;
         const project = req.query.project;
         
-        // Filter token metrics
-        let tokenMetrics = inMemoryMessages.filter(msg => msg.message_type === 'token_metric');
+        // Get messages and filter token metrics
+        const messages = await getMessagesFromStorage(1000, project); // Get more messages for token analysis
+        let tokenMetrics = messages.filter(msg => msg.message_type === 'token_metric');
         
         // Filter by time
         const cutoffDate = new Date();
@@ -1941,18 +2184,8 @@ async function loadInitialDataToMemory() {
                 .limit(500)
                 .toArray();
             
-            // Clear memory and load fresh data
-            inMemoryMessages.splice(0, inMemoryMessages.length);
-            
-            recentMessages.reverse().forEach(msg => {
-                inMemoryMessages.push({
-                    ...msg,
-                    timestamp: msg.timestamp.toISOString(),
-                    created_at: msg.created_at.toISOString()
-                });
-            });
-            
-            console.log(`🔄 Loaded ${inMemoryMessages.length} recent messages into memory from MongoDB`);
+            // Data initialization complete - Redis cache will handle recent messages automatically
+            console.log(`🔄 Database initialization complete: ${recentMessages.length} recent messages available in MongoDB`);
         }
     } catch (error) {
         console.warn('⚠️  Failed to load initial data:', error.message);

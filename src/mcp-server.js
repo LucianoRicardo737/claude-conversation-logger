@@ -88,7 +88,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "search_conversations",
-        description: "Search conversation history with freshness prioritization",
+        description: "Search conversation history with dual-layer strategy (Redis for recent, MongoDB for historical)",
         inputSchema: {
           type: "object",
           properties: {
@@ -101,6 +101,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Limit search to last N days (default: 7)",
               default: 7
             },
+            deep: {
+              type: "boolean",
+              description: "Force deep search in MongoDB (slower but complete historical data). Default: false",
+              default: false
+            },
             include_resolved: {
               type: "boolean",
               description: "Include already resolved conversations (default: false)",
@@ -110,6 +115,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               description: "Maximum number of results (default: 10)",
               default: 10
+            },
+            project: {
+              type: "string",
+              description: "Filter by specific project name (optional)"
             }
           },
           required: ["query"]
@@ -179,16 +188,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (request.params.name) {
     case "search_conversations":
       try {
-        const { query, days = 7, include_resolved = false, limit = 10 } = request.params.arguments;
+        const { query, days = 7, deep = false, include_resolved = false, limit = 10, project } = request.params.arguments;
         
-        // Search in API
+        // Choose endpoint based on deep parameter
+        const endpoint = deep ? 'search/deep' : 'search';
+        
+        // Build search parameters
         const searchParams = new URLSearchParams({
           q: query,
           days: days.toString(),
-          limit: (limit * 2).toString() // Get more to filter
+          limit: (limit * 2).toString(), // Get more to filter
+          deep: deep.toString()
         });
 
-        const results = await apiRequest(`search?${searchParams}`);
+        if (project) {
+          searchParams.set('project', project);
+        }
+
+        const results = await apiRequest(`${endpoint}?${searchParams}`);
         
         // Filter and prioritize results
         let filteredResults = results.messages || [];
@@ -206,16 +223,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .sort((a, b) => b.freshness_score - a.freshness_score)
           .slice(0, limit);
 
+        // Build response with search strategy info
+        const searchStrategy = deep ? '🗄️ Deep MongoDB' : days > 30 ? '🗄️ MongoDB' : '⚡ Redis+MongoDB';
+        const resultSource = results.source || (deep ? 'mongodb_deep' : 'smart');
+        
         return {
           content: [
             {
               type: "text",
-              text: `🔍 Found ${filteredResults.length} conversations for "${query}":\n\n` +
+              text: `🔍 **Search Results** (${searchStrategy})\n` +
+                `Query: "${query}" | Days: ${days} | Project: ${project || 'all'} | Deep: ${deep}\n` +
+                `Found: ${filteredResults.length} conversations | Source: ${resultSource}\n\n` +
                 filteredResults.map((msg, i) => 
-                  `${i + 1}. **${msg.project_name}** (${new Date(msg.created_at || msg.timestamp).toLocaleString()})\n` +
-                  `   Score: ${msg.freshness_score}/100\n` +
-                  `   ${msg.content.substring(0, 150)}...\n`
-                ).join('\n')
+                  `**${i + 1}. ${msg.project_name}** (${new Date(msg.created_at || msg.timestamp).toLocaleString()})\n` +
+                  `   📊 Freshness: ${msg.freshness_score}/100 | Type: ${msg.message_type || 'message'}\n` +
+                  `   💬 ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}\n\n`
+                ).join('')
             }
           ]
         };
@@ -223,7 +246,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: "text",
-            text: `❌ Error searching conversations: ${error.message}`
+            text: `❌ Error searching conversations: ${error.message}\nTip: Try with 'deep: true' for comprehensive MongoDB search`
           }]
         };
       }
@@ -279,14 +302,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         const { days = 7, project } = request.params.arguments;
         
+        // Use deep search for comprehensive analysis when analyzing > 14 days
+        const useDeepSearch = days > 14;
+        const endpoint = useDeepSearch ? 'search/deep' : 'messages';
+        
         const params = new URLSearchParams({
           days: days.toString(),
-          limit: '100' // Obtener más datos para análisis
+          limit: useDeepSearch ? '200' : '100' // More data for deep analysis
         });
         
         if (project) params.set('project', project);
+        
+        // For deep search, add a broad query to get all messages
+        if (useDeepSearch) {
+          params.set('q', ''); // Empty query gets all messages within time range
+        }
 
-        const results = await apiRequest(`messages?${params}`);
+        const results = await apiRequest(`${endpoint}?${params}`);
         const messages = results.messages || [];
         
         // Pattern analysis
@@ -328,15 +360,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Hora más activa
         const mostActiveHour = hourlyActivity.indexOf(Math.max(...hourlyActivity));
 
+        // Build analysis results
+        const analysisSource = useDeepSearch ? '🗄️ MongoDB Deep Analysis' : '⚡ Redis+MongoDB Analysis';
+        const projectFilter = project ? ` (Project: ${project})` : ' (All projects)';
+        
         return {
           content: [{
             type: "text",
-            text: `📊 Conversation analysis (last ${days} days):\n\n` +
-              `**Most active projects:**\n${topProjects.map(([proj, count]) => `• ${proj}: ${count} messages`).join('\n')}\n\n` +
-              `**Frequent keywords:**\n${topKeywords.map(([word, count]) => `• ${word}: ${count} times`).join('\n')}\n\n` +
-              `**Most active hour:** ${mostActiveHour}:00 (${hourlyActivity[mostActiveHour]} messages)\n\n` +
-              `**Total unique sessions:** ${Object.keys(sessionCounts).length}\n` +
-              `**Total messages:** ${messages.length}`
+            text: `📊 **Conversation Patterns Analysis** (${analysisSource})\n` +
+              `Period: Last ${days} days${projectFilter} | Messages analyzed: ${messages.length}\n\n` +
+              
+              `**📈 Most Active Projects:**\n${topProjects.map(([proj, count]) => `• **${proj}**: ${count} messages`).join('\n')}\n\n` +
+              
+              `**🔤 Frequent Keywords:**\n${topKeywords.map(([word, count]) => `• ${word}: ${count} times`).join('\n')}\n\n` +
+              
+              `**⏰ Peak Activity:**\n• Most active hour: **${mostActiveHour}:00** (${hourlyActivity[mostActiveHour]} messages)\n` +
+              `• Activity distribution: ${hourlyActivity.filter(h => h > 0).length}/24 hours active\n\n` +
+              
+              `**📊 Session Statistics:**\n• Unique sessions: **${Object.keys(sessionCounts).length}**\n` +
+              `• Average messages per session: **${Math.round(messages.length / Object.keys(sessionCounts).length || 0)}**\n` +
+              `• Total messages: **${messages.length}**\n\n` +
+              
+              `**💡 Data Source:** ${results.source || (useDeepSearch ? 'mongodb_deep' : 'combined')}`
           }]
         };
       } catch (error) {
