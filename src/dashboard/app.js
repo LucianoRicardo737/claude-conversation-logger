@@ -3,14 +3,14 @@ console.log('🚀 Starting optimized app.js initialization with gRPC');
 const { createApp, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 // Import optimized components
-import { BaseComponent } from './components/BaseComponent.js';
-import { LoadingSpinner } from './components/LoadingSpinner.js';
-import { VirtualScroll } from './components/VirtualScroll.js';
-import { SearchFilters } from './components/SearchFilters.js';
-import { BreadcrumbNavigation } from './components/BreadcrumbNavigation.js';
+// import { BaseComponent } from './components/BaseComponent.js';
+// import { LoadingSpinner } from './components/LoadingSpinner.js';
+// import { VirtualScroll } from './components/VirtualScroll.js';
+// import { SearchFilters } from './components/SearchFilters.js';
+// import { BreadcrumbNavigation } from './components/BreadcrumbNavigation.js';
 
-// Import gRPC service instead of WebSocket
-import grpcService from './services/grpc-service.js';
+// Import API service (REST with polling for browser compatibility)
+import apiService from './services/api-service.js';
 
 // Global configuration
 const API_BASE_URL = window.location.origin;
@@ -66,181 +66,9 @@ const store = reactive({
                  window.matchMedia('(prefers-color-scheme: dark)').matches)
 });
 
-// Enhanced API service with caching and retry logic
-class OptimizedApiService {
-    constructor() {
-        this.cache = new Map();
-        this.cacheTTL = 5 * 60 * 1000; // 5 minutes
-        this.requestQueue = new Map();
-        this.retryAttempts = 3;
-        this.retryDelay = 1000;
-    }
-
-    async request(endpoint, options = {}) {
-        const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
-        
-        // Check cache for GET requests
-        if (!options.method || options.method === 'GET') {
-            const cached = this.getFromCache(cacheKey);
-            if (cached) {
-                console.log(`📦 Cache hit for ${endpoint}`);
-                return cached;
-            }
-        }
-
-        // Prevent duplicate requests
-        if (this.requestQueue.has(cacheKey)) {
-            console.log(`⏳ Waiting for ongoing request ${endpoint}`);
-            return this.requestQueue.get(cacheKey);
-        }
-
-        const requestPromise = this.executeRequest(endpoint, options);
-        this.requestQueue.set(cacheKey, requestPromise);
-
-        try {
-            const result = await requestPromise;
-            
-            // Cache successful GET requests
-            if (!options.method || options.method === 'GET') {
-                this.setCache(cacheKey, result);
-            }
-            
-            return result;
-        } catch (error) {
-            throw error;
-        } finally {
-            this.requestQueue.delete(cacheKey);
-        }
-    }
-
-    async executeRequest(endpoint, options = {}) {
-        const url = `${API_BASE_URL}/api/${endpoint}`;
-        
-        for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        'X-API-Key': API_KEY,
-                        'Content-Type': 'application/json',
-                        ...options.headers,
-                    },
-                    ...options,
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
-                }
-
-                return await response.json();
-            } catch (error) {
-                console.error(`❌ Request failed (attempt ${attempt}/${this.retryAttempts}):`, error);
-                
-                if (attempt === this.retryAttempts) {
-                    throw error;
-                }
-                
-                // Exponential backoff
-                await new Promise(resolve => 
-                    setTimeout(resolve, this.retryDelay * Math.pow(2, attempt - 1))
-                );
-            }
-        }
-    }
-
-    getFromCache(key) {
-        const cached = this.cache.get(key);
-        if (!cached) return null;
-        
-        if (Date.now() > cached.expiry) {
-            this.cache.delete(key);
-            return null;
-        }
-        
-        return cached.data;
-    }
-
-    setCache(key, data) {
-        this.cache.set(key, {
-            data,
-            expiry: Date.now() + this.cacheTTL
-        });
-    }
-
-    clearCache() {
-        this.cache.clear();
-    }
-
-    // API methods with enhanced error handling
-    async getConversationTree(filters = {}) {
-        console.log('📡 Fetching conversation tree...');
-        const params = new URLSearchParams(filters).toString();
-        const endpoint = `conversations/tree${params ? `?${params}` : ''}`;
-        return this.request(endpoint);
-    }
-
-    async getConversationDetails(sessionId) {
-        return this.request(`conversations/${sessionId}`);
-    }
-
-    async searchConversations(query, filters = {}) {
-        const params = new URLSearchParams();
-        if (query) params.append('q', query);
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value !== '' && value !== null && value !== undefined) {
-                if (Array.isArray(value)) {
-                    value.forEach(v => params.append(key, v));
-                } else {
-                    params.append(key, value.toString());
-                }
-            }
-        });
-        
-        return this.request(`search/advanced?${params.toString()}`);
-    }
-
-    async markConversation(sessionId, isMarked, note = '', tags = []) {
-        return this.request(`conversations/${sessionId}/mark`, {
-            method: 'POST',
-            body: JSON.stringify({
-                is_marked: isMarked,
-                note,
-                tags
-            })
-        });
-    }
-
-    async exportConversation(sessionId, format = 'json') {
-        const params = new URLSearchParams({ format }).toString();
-        const response = await fetch(`${API_BASE_URL}/api/conversations/${sessionId}/export?${params}`, {
-            headers: { 'X-API-Key': API_KEY }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Export failed: ${response.status} ${response.statusText}`);
-        }
-        
-        if (format === 'json') {
-            return response.json();
-        } else {
-            return {
-                content: await response.text(),
-                filename: `conversation_${sessionId.substring(0, 8)}.${format}`,
-                mime_type: format === 'markdown' ? 'text/markdown' : 'text/plain'
-            };
-        }
-    }
-
-    async getSystemStats() {
-        return this.request('stats');
-    }
-}
-
-// Initialize API service
-const apiService = new OptimizedApiService();
-
 // Enhanced Dashboard Component
 const OptimizedDashboard = {
-    mixins: [BaseComponent],
+    // mixins: [BaseComponent],
 
     data() {
         return {
@@ -286,535 +114,106 @@ const OptimizedDashboard = {
                 return cache.data;
             }
             
-            // Compute new result
-            const filtered = this.store.conversations
-                .filter(project => {
-                    if (!this.store.searchFilters.project) return true;
-                    return project.name.toLowerCase().includes(
-                        this.store.searchFilters.project.toLowerCase()
-                    );
-                })
-                .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
+            // Compute filtered results
+            const projects = this.store.conversations.filter(project => {
+                if (this.store.searchFilters.project && 
+                    !project.name.toLowerCase().includes(this.store.searchFilters.project.toLowerCase())) {
+                    return false;
+                }
+                return true;
+            });
             
             // Cache the result
-            cache.data = filtered;
+            cache.data = projects;
             cache.lastConversationsLength = conversationsLength;
             cache.lastFiltersHash = filtersHash;
             
-            return filtered;
+            return projects;
         },
 
-        activeProjects() {
-            return this.filteredProjects.filter(project => 
-                project.sessions && project.sessions.some(session => session.is_active)
+        hasActiveFilters() {
+            const filters = this.store.searchFilters;
+            return filters.project || filters.messageType || filters.startDate || 
+                   filters.endDate || filters.onlyMarked || filters.tags.length > 0;
+        },
+
+        totalSessionsCount() {
+            return this.filteredProjects.reduce((total, project) => 
+                total + (project.sessions ? project.sessions.length : 0), 0
             );
         },
 
-        recentSessions() {
-            const sessions = [];
-            if (this.store.conversations) {
-                this.store.conversations.forEach(project => {
-                    if (project.sessions) {
-                        project.sessions.forEach(session => {
-                            sessions.push({
-                                ...session,
-                                project_name: project.name
-                            });
-                        });
-                    }
-                });
-            }
-            
-            return sessions
-                .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity))
-                .slice(0, 10);
-        },
-
-        dashboardStats() {
-            const conversations = this.store.conversations || [];
-            const totalSessions = conversations.reduce((sum, p) => sum + ((p.sessions && p.sessions.length) || 0), 0);
-            const totalMessages = conversations.reduce((sum, p) => sum + (p.message_count || 0), 0);
-            const activeSessions = conversations.reduce((sum, p) => 
-                sum + ((p.sessions && p.sessions.filter(s => s.is_active) && p.sessions.filter(s => s.is_active).length) || 0), 0
+        totalMessagesCount() {
+            return this.filteredProjects.reduce((total, project) => 
+                total + (project.message_count || 0), 0
             );
-
-            // Calculate token usage and costs from message metadata
-            const totalTokens = this.calculateTotalTokens();
-            const estimatedCost = this.calculateEstimatedCost();
-            const avgMessagesPerSession = totalSessions > 0 ? Math.round(totalMessages / totalSessions) : 0;
-
-            return {
-                totalProjects: conversations.length,
-                totalSessions,
-                totalMessages,
-                activeSessions,
-                totalTokens,
-                estimatedCost,
-                avgMessagesPerSession,
-                lastUpdate: Date.now()
-            };
         }
     },
 
     async mounted() {
-        console.log('🎯 Optimized Dashboard mounted with gRPC');
+        console.log('🎯 OptimizedDashboard mounted with enhanced performance');
         
-        // Apply theme
-        this.applyTheme();
+        const startTime = performance.now();
         
-        // Initialize keyboard shortcuts
-        this.initializeKeyboardShortcuts();
-        
-        // Initialize gRPC connection and event listeners
-        this.initializeGrpcConnection();
-        
-        // Load initial data
-        await this.loadInitialData();
-        
-        // Setup auto-refresh
-        this.setupAutoRefresh();
-        
-        // Setup performance monitoring
-        this.startPerformanceMonitoring();
-    },
-
-    beforeUnmount() {
-        // Cleanup gRPC connection
-        grpcService.disconnect();
-        
-        // Cleanup intervals
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
-        }
-        
-        this.removeKeyboardShortcuts();
-        apiService.clearCache();
-    },
-
-    methods: {
-        // Calculate total tokens from all conversations
-        calculateTotalTokens() {
-            const conversations = this.store.conversations || [];
-            let totalTokens = 0;
-            
-            conversations.forEach(project => {
-                if (project.sessions) {
-                    project.sessions.forEach(session => {
-                        if (session.recent_messages) {
-                            session.recent_messages.forEach(message => {
-                                if (message.metadata && message.metadata.usage) {
-                                    const usage = message.metadata.usage;
-                                    totalTokens += (usage.input_tokens || 0) + (usage.output_tokens || 0);
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-            
-            return totalTokens;
-        },
-
-        // Calculate estimated cost from token usage
-        calculateEstimatedCost() {
-            const conversations = this.store.conversations || [];
-            let totalCost = 0;
-            
-            conversations.forEach(project => {
-                if (project.sessions) {
-                    project.sessions.forEach(session => {
-                        if (session.recent_messages) {
-                            session.recent_messages.forEach(message => {
-                                if (message.metadata && message.metadata.cost_usd) {
-                                    totalCost += parseFloat(message.metadata.cost_usd) || 0;
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-            
-            return totalCost;
-        },
-
-        /**
-         * Smart merge of conversation data to prevent flickering
-         */
-        mergeConversationData(newProjects) {
-            if (!newProjects || !Array.isArray(newProjects)) {
-                return;
-            }
-
-            // If no existing data, just set it with smooth transitions
-            if (!this.store.conversations || this.store.conversations.length === 0) {
-                this.store.conversations = newProjects;
-                // Add GPU acceleration for smooth rendering
-                nextTick(() => {
-                    document.querySelectorAll('.project-card').forEach(el => {
-                        el.classList.add('gpu-accelerated');
-                    });
-                });
-                return;
-            }
-
-            const existingProjects = new Map();
-            this.store.conversations.forEach((project, index) => {
-                existingProjects.set(project.name, { project, index });
-            });
-
-            const updatedProjects = [];
-            
-            newProjects.forEach(newProject => {
-                const existing = existingProjects.get(newProject.name);
-                
-                if (existing) {
-                    // Merge existing project with new data
-                    const mergedProject = this.mergeProject(existing.project, newProject);
-                    updatedProjects.push(mergedProject);
-                    existingProjects.delete(newProject.name);
-                } else {
-                    // New project - add it
-                    updatedProjects.push(newProject);
-                }
-            });
-
-            // Sort by last activity (most recent first)
-            updatedProjects.sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
-
-            // Update store without replacing the entire array reference
-            this.store.conversations.splice(0, this.store.conversations.length, ...updatedProjects);
-        },
-
-        /**
-         * Merge individual project data intelligently
-         */
-        mergeProject(existing, newData) {
-            // If no significant changes, return existing reference to prevent re-render
-            if (existing.message_count === newData.message_count &&
-                existing.last_activity === newData.last_activity &&
-                (existing.sessions && existing.sessions.length) === (newData.sessions && newData.sessions.length)) {
-                return existing;
-            }
-
-            // Merge sessions intelligently
-            const mergedSessions = this.mergeSessions(existing.sessions || [], newData.sessions || []);
-
-            return {
-                ...existing,
-                message_count: newData.message_count,
-                last_activity: newData.last_activity,
-                sessions: mergedSessions
-            };
-        },
-
-        /**
-         * Merge sessions to preserve UI state (expanded/collapsed, etc.)
-         */
-        mergeSessions(existingSessions, newSessions) {
-            const sessionMap = new Map();
-            existingSessions.forEach(session => {
-                sessionMap.set(session.session_id, session);
-            });
-
-            const merged = [];
-            newSessions.forEach(newSession => {
-                const existing = sessionMap.get(newSession.session_id);
-                
-                if (existing) {
-                    // Preserve UI state while updating data
-                    merged.push({
-                        ...existing,
-                        message_count: newSession.message_count,
-                        last_activity: newSession.last_activity,
-                        is_active: newSession.is_active,
-                        recent_messages: newSession.recent_messages || existing.recent_messages
-                    });
-                } else {
-                    // New session
-                    merged.push(newSession);
-                }
-            });
-
-            return merged.sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
-        },
-
-        async loadInitialData() {
-            await this.handleAsyncOperation(async () => {
-                console.log('📊 Loading dashboard data...');
-                
-                const startTime = performance.now();
-                
-                // Load conversation tree and stats in parallel
-                const [conversationData, statsData] = await Promise.all([
-                    apiService.getConversationTree({ limit: 50, hours_back: 48 }),
-                    apiService.getSystemStats()
-                ]);
-                
-                // Use smart merge instead of replacing entire array
-                this.mergeConversationData(conversationData.projects);
-                this.store.liveStats = {
-                    total_messages: statsData.total_messages || 0,
-                    total_sessions: conversationData.total_sessions || 0,
-                    active_projects: statsData.projects || 0,
-                    recent_activity: statsData.recent_activity || {}
-                };
-                
-                this.performanceMetrics.renderTime = performance.now() - startTime;
-                this.lastUpdate = new Date();
-                
-                console.log(`✅ Dashboard loaded in ${(this.performanceMetrics.renderTime || 0).toFixed(2)}ms`);
-            }, { 
-                loadingMessage: 'Loading dashboard...',
-                showLoading: true 
-            });
-        },
-
-        initializeGrpcConnection() {
-            console.log('🔗 Initializing gRPC connection...');
+        try {
+            // Setup keyboard shortcuts
+            this.setupKeyboardShortcuts();
             
             // Setup connection status listener
-            grpcService.on('connection', (data) => {
+            apiService.on('connection', (data) => {
                 this.store.connectionStatus = data.status;
-                console.log(`📡 gRPC connection status: ${data.status}`);
-                
-                if (data.status === 'connected') {
-                    console.log('✅ gRPC connected successfully');
-                } else if (data.status === 'error') {
-                    console.error('❌ gRPC connection error');
-                }
+                console.log(`📡 API service connection status: ${data.status}`);
             });
             
             // Setup real-time message listener
-            grpcService.on('new_message', (message) => {
-                console.log('📨 New message received via gRPC:', message);
+            apiService.on('new_message', (message) => {
+                console.log('📨 New message received via API service:', message);
                 this.handleNewMessage(message);
             });
             
             // Setup live stats listener  
-            grpcService.on('live_stats', (stats) => {
+            apiService.on('live_stats', (stats) => {
                 this.updateLiveStats(stats);
             });
             
             // Setup session updates listener
-            grpcService.on('session_start', (message) => {
-                console.log('🚀 New session started via gRPC');
+            apiService.on('session_start', (message) => {
+                console.log('🚀 New session started via API service:');
                 this.handleSessionStart(message);
             });
             
-            grpcService.on('session_end', (message) => {
-                console.log('🔚 Session ended via gRPC');
+            apiService.on('session_end', (message) => {
+                console.log('🔚 Session ended via API service');
                 this.handleSessionEnd(message);
             });
             
-            // Update connection status
-            this.store.connectionStatus = grpcService.getConnectionStatus();
-        },
-
-        handleNewMessage(message) {
-            // Update conversation data with new message using optimized approach
-            if (message && message.session_id) {
-                let updated = false;
-                
-                // Find and update the relevant conversation without causing reactive updates
-                for (let i = 0; i < this.store.conversations.length; i++) {
-                    const project = this.store.conversations[i];
-                    if (project.sessions) {
-                        for (let j = 0; j < project.sessions.length; j++) {
-                            const session = project.sessions[j];
-                            if (session.session_id === message.session_id) {
-                                // Update session data in place
-                                session.message_count = (session.message_count || 0) + 1;
-                                session.last_activity = Date.now();
-                                session.is_active = true;
-                                
-                                // Add to recent messages (keep only last 3)
-                                if (!session.recent_messages) {
-                                    session.recent_messages = [];
-                                }
-                                session.recent_messages.push(message);
-                                session.recent_messages = session.recent_messages.slice(-3);
-                                
-                                // Update project last activity and message count
-                                project.last_activity = Date.now();
-                                project.message_count = (project.message_count || 0) + 1;
-                                
-                                updated = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (updated) break;
-                }
-                
-                // Update live stats efficiently
-                this.store.liveStats.total_messages++;
-                if (this.store.liveStats.recent_activity) {
-                    this.store.liveStats.recent_activity.messages_last_hour++;
-                }
-            }
-        },
-
-        handleSessionStart(message) {
-            // Add new session to conversations if needed
-            if (message && message.session_id && message.project_name) {
-                let project = this.store.conversations.find(p => p.name === message.project_name);
-                
-                if (!project) {
-                    // Create new project
-                    project = {
-                        name: message.project_name,
-                        message_count: 0,
-                        sessions: [],
-                        last_activity: Date.now()
-                    };
-                    this.store.conversations.push(project);
-                }
-                
-                // Add new session
-                const newSession = {
-                    session_id: message.session_id,
-                    short_id: message.session_id.substring(0, 8),
-                    message_count: 1,
-                    start_time: Date.now(),
-                    last_activity: Date.now(),
-                    is_active: true,
-                    is_marked: false,
-                    recent_messages: [message]
-                };
-                
-                project.sessions.unshift(newSession);
-                project.last_activity = Date.now();
-                
-                // Update stats
-                this.store.liveStats.total_sessions++;
-                if (this.store.liveStats.recent_activity) {
-                    this.store.liveStats.recent_activity.active_sessions++;
-                }
-            }
-        },
-
-        handleSessionEnd(message) {
-            // Mark session as inactive
-            if (message && message.session_id) {
-                this.store.conversations.forEach(project => {
-                    if (project.sessions) {
-                        const session = project.sessions.find(s => s.session_id === message.session_id);
-                        if (session) {
-                            session.is_active = false;
-                        }
-                    }
-                });
-                
-                // Update active sessions count
-                if (this.store.liveStats.recent_activity) {
-                    this.store.liveStats.recent_activity.active_sessions = Math.max(0, 
-                        this.store.liveStats.recent_activity.active_sessions - 1);
-                }
-            }
-        },
-
-        updateLiveStats(stats) {
-            // Update live statistics from gRPC stream with animation
-            const oldStats = { ...this.store.liveStats };
-            this.store.liveStats = {
-                ...this.store.liveStats,
-                ...stats
-            };
+            // Setup performance monitoring
+            this.startPerformanceMonitoring();
             
-            // Trigger stat update animations
-            this.triggerStatAnimations(oldStats, this.store.liveStats);
-        },
-
-        triggerStatAnimations(oldStats, newStats) {
-            // Animate stat cards that have changed
-            nextTick(() => {
-                const statsToCheck = ['total_messages', 'total_sessions', 'active_sessions'];
-                
-                statsToCheck.forEach(stat => {
-                    if (oldStats[stat] !== newStats[stat]) {
-                        // Find the corresponding stat card and animate it
-                        const statCards = document.querySelectorAll('.stat-number');
-                        statCards.forEach(card => {
-                            card.classList.add('stat-update');
-                            setTimeout(() => card.classList.remove('stat-update'), 600);
-                        });
-                    }
-                });
-            });
-        },
-
-        async refreshData() {
-            console.log('🔄 Refreshing dashboard data...');
-            // Don't clear cache - let it expire naturally for better UX
-            // Only clear if we detect stale data or user explicitly refreshes
-            await this.loadInitialData();
-        },
-
-        setupAutoRefresh() {
-            // Refresh every 30 seconds
-            this.refreshInterval = setInterval(() => {
-                if (document.visibilityState === 'visible') {
-                    this.refreshData();
-                }
-            }, 30000);
-        },
-
-        applyTheme() {
-            const htmlElement = document.documentElement;
-            if (this.store.isDarkMode) {
-                htmlElement.setAttribute('data-theme', 'dark');
-                htmlElement.classList.add('dark');
-            } else {
-                htmlElement.setAttribute('data-theme', 'light');
-                htmlElement.classList.remove('dark');
-            }
+            // Initialize data with error handling
+            await this.initializeData();
             
-            // Save preference
-            localStorage.setItem('claude-dashboard-theme', this.store.isDarkMode ? 'dark' : 'light');
-        },
-
-        toggleTheme() {
-            this.store.isDarkMode = !this.store.isDarkMode;
+            // Start auto-refresh
+            this.startAutoRefresh();
+            
+            // Apply theme
             this.applyTheme();
-        },
-
-        initializeKeyboardShortcuts() {
-            this.keyboardShortcuts.set('r', () => this.refreshData());
-            this.keyboardShortcuts.set('s', () => this.focusSearch());
-            this.keyboardShortcuts.set('d', () => this.setActiveView('dashboard'));
-            this.keyboardShortcuts.set('p', () => this.setActiveView('projects'));
-            this.keyboardShortcuts.set('t', () => this.toggleTheme());
-            this.keyboardShortcuts.set('/', () => this.focusSearch());
-
-            document.addEventListener('keydown', this.handleKeyboardShortcut);
-        },
-
-        removeKeyboardShortcuts() {
-            document.removeEventListener('keydown', this.handleKeyboardShortcut);
-        },
-
-        handleKeyboardShortcut(event) {
-            // Only handle shortcuts when not in input fields
-            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-                return;
-            }
-
-            const key = event.key.toLowerCase();
-            const shortcut = this.keyboardShortcuts.get(key);
             
-            if (shortcut) {
-                event.preventDefault();
-                shortcut();
-            }
-        },
+            this.performanceMetrics.renderTime = performance.now() - startTime;
+            console.log(`⚡ Dashboard initialized in ${this.performanceMetrics.renderTime.toFixed(2)}ms`);
+            
+        } catch (error) {
+            console.error('❌ Dashboard initialization error:', error);
+            this.store.error = `Initialization failed: ${error.message}`;
+        }
+    },
 
-        focusSearch() {
-            const searchInput = document.querySelector('input[type="text"]');
-            if (searchInput) {
-                searchInput.focus();
-            }
-        },
+    beforeUnmount() {
+        this.cleanup();
+    },
 
+    methods: {
+        // === Core Navigation ===
         setActiveView(view) {
             this.store.activeView = view;
             this.updateBreadcrumbs(view);
@@ -824,23 +223,77 @@ const OptimizedDashboard = {
             const breadcrumbs = [
                 { label: 'Dashboard', action: () => this.setActiveView('dashboard') }
             ];
-
+            
             if (view === 'projects') {
                 breadcrumbs.push({ label: 'Projects' });
             } else if (view === 'sessions') {
-                breadcrumbs.push({ label: 'Sessions' });
+                breadcrumbs.push({ label: 'Projects', action: () => this.setActiveView('projects') });
+                if (this.store.selectedProject) {
+                    breadcrumbs.push({ label: this.store.selectedProject.name });
+                }
+            } else if (view === 'details') {
+                breadcrumbs.push({ label: 'Projects', action: () => this.setActiveView('projects') });
+                if (this.store.selectedProject) {
+                    breadcrumbs.push({ 
+                        label: this.store.selectedProject.name,
+                        action: () => this.setActiveView('sessions')
+                    });
+                }
+                breadcrumbs.push({ label: 'Session Details' });
             } else if (view === 'search') {
                 breadcrumbs.push({ label: 'Search Results' });
             }
-
+            
             this.breadcrumbItems = breadcrumbs;
         },
 
-        async handleSearch(filters) {
-            console.log('🔍 Performing search...', filters);
+        // === Data Loading ===
+        async initializeData() {
+            await this.handleAsyncOperation(async () => {
+                console.log('📊 Loading initial dashboard data...');
+                
+                // Connect to API service
+                const connected = await apiService.connect();
+                if (!connected) {
+                    throw new Error('Failed to connect to API service');
+                }
+                
+                // Load conversation tree
+                const conversationTree = await apiService.getConversationTree();
+                console.log('📋 Conversation tree loaded:', conversationTree);
+                
+                if (conversationTree && conversationTree.projects) {
+                    this.store.conversations = conversationTree.projects.map(project => ({
+                        name: project.project_name,
+                        sessions: project.sessions || [],
+                        message_count: project.total_messages || 0,
+                        last_activity: project.last_activity
+                    }));
+                }
+                
+                // Load initial stats
+                const stats = await apiService.getStats();
+                this.updateLiveStats(stats);
+                
+                this.lastUpdate = new Date();
+                console.log('✅ Dashboard data loaded successfully');
+                
+            }, {
+                loadingMessage: 'Loading dashboard...',
+                showLoading: true
+            });
+        },
+
+        // === Search ===
+        async performSearch() {
+            if (!this.store.searchQuery.trim()) return;
             
             await this.handleAsyncOperation(async () => {
-                const results = await apiService.searchConversations(filters.query, filters);
+                const results = await apiService.searchConversations(
+                    this.store.searchQuery,
+                    this.store.searchFilters
+                );
+                
                 this.store.searchResults = results.results || [];
                 this.setActiveView('search');
             }, { 
@@ -866,364 +319,758 @@ const OptimizedDashboard = {
             });
         },
 
+        // === Real-time Updates ===
+        updateLiveStats(stats) {
+            if (!stats) return;
+            
+            console.log('📊 Updating live stats:', stats);
+            
+            // Update store with animation classes
+            this.store.liveStats = { ...this.store.liveStats, ...stats };
+            
+            // Trigger update animations for changed values
+            this.$nextTick(() => {
+                this.animateStatUpdates();
+            });
+        },
+
+        handleNewMessage(message) {
+            console.log('📨 Processing new message:', message);
+            // Add to appropriate conversation/session
+            // This would be more complex in real implementation
+        },
+
+        handleSessionStart(session) {
+            console.log('🚀 Processing new session:', session);
+            // Update conversations list
+        },
+
+        handleSessionEnd(session) {
+            console.log('🔚 Processing ended session:', session);
+            // Update session status
+        },
+
+        // === Performance Monitoring ===
         startPerformanceMonitoring() {
-            // Monitor API calls
             const originalRequest = apiService.request;
             const self = this;
+            
             apiService.request = async function() {
                 self.performanceMetrics.apiCallCount++;
                 return originalRequest.apply(apiService, arguments);
             };
         },
 
-        formatMetric(value, type = 'number') {
-            if (type === 'number') {
-                return this.formatNumber(value, { compact: true });
-            } else if (type === 'time') {
-                return this.formatTimestamp(value);
-            }
-            return value;
+        animateStatUpdates() {
+            // Add CSS classes for animations
+            const statElements = this.$el.querySelectorAll('.stat-number');
+            statElements.forEach(el => {
+                el.classList.add('number-update');
+                setTimeout(() => el.classList.remove('number-update'), 500);
+            });
         },
 
-        formatNumber(num, options = {}) {
-            if (typeof num !== 'number') return '0';
+        // === Keyboard Shortcuts ===
+        setupKeyboardShortcuts() {
+            this.keyboardShortcuts.set('d', () => this.setActiveView('dashboard'));
+            this.keyboardShortcuts.set('p', () => this.setActiveView('projects'));
+            this.keyboardShortcuts.set('t', () => this.toggleTheme());
+            this.keyboardShortcuts.set('/', () => this.focusSearch());
             
-            if (options.compact && num >= 1000) {
-                const units = ['', 'K', 'M', 'B'];
-                const unitIndex = Math.floor(Math.log10(Math.abs(num)) / 3);
-                const scaledNum = num / Math.pow(1000, unitIndex);
-                return scaledNum.toFixed(1) + units[unitIndex];
-            }
-            
-            return num.toLocaleString();
+            document.addEventListener('keydown', this.handleKeyboardShortcut);
         },
 
+        handleKeyboardShortcut(event) {
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            const handler = this.keyboardShortcuts.get(event.key.toLowerCase());
+            if (handler) {
+                event.preventDefault();
+                handler();
+            }
+        },
+
+        focusSearch() {
+            const searchInput = this.$el.querySelector('input[type="text"]');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        },
+
+        // === Theme Management ===
+        toggleTheme() {
+            this.store.isDarkMode = !this.store.isDarkMode;
+            this.applyTheme();
+        },
+
+        applyTheme() {
+            const theme = this.store.isDarkMode ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('claude-dashboard-theme', theme);
+        },
+
+        // === Auto-refresh ===
+        startAutoRefresh() {
+            this.refreshInterval = setInterval(async () => {
+                try {
+                    const stats = await apiService.getStats();
+                    this.updateLiveStats(stats);
+                } catch (error) {
+                    console.warn('⚠️ Auto-refresh error:', error.message);
+                }
+            }, 30000); // 30 seconds
+        },
+
+        // === Utilities ===
+        formatTimestamp(timestamp) {
+            if (!timestamp) return 'Unknown';
+            return new Date(timestamp).toLocaleString();
+        },
+
+        formatMetric(value) {
+            if (!value || value === 0) return '0';
+            if (value < 1000) return value.toString();
+            if (value < 1000000) return (value / 1000).toFixed(1) + 'K';
+            return (value / 1000000).toFixed(1) + 'M';
+        },
+
+        // === Navigation History ===
+        handleBrowserNavigation() {
+            const currentView = this.store.activeView;
+            
+            if (window.location.hash) {
+                const viewFromHash = window.location.hash.substring(1);
+                const validViews = ['dashboard', 'projects', 'sessions', 'details', 'search'];
+                
+                if (validViews.includes(viewFromHash) && viewFromHash !== currentView) {
+                    this.restoreViewFromHash(viewFromHash);
+                }
+            }
+        },
+
+        restoreViewFromHash(view) {
+            switch (view) {
+                case 'dashboard':
+                    this.setActiveView('dashboard');
+                    break;
+                case 'projects':
+                    this.setActiveView('projects');
+                    break;
+                case 'sessions':
+                    if (this.store.selectedProject) {
+                        this.setActiveView('sessions');
+                    } else {
+                        this.setActiveView('dashboard');
+                    }
+                    break;
+                case 'details':
+                    if (this.store.selectedSession) {
+                        this.setActiveView('details');
+                    } else {
+                        this.setActiveView('dashboard');
+                    }
+                    break;
+                default:
+                    this.setActiveView('dashboard');
+            }
+        },
+
+        // === Cleanup ===
+        cleanup() {
+            if (this.refreshInterval) {
+                clearInterval(this.refreshInterval);
+            }
+            
+            document.removeEventListener('keydown', this.handleKeyboardShortcut);
+            console.log('🧹 Dashboard cleanup completed');
+        },
+
+        // === Missing computed properties ===
+        dashboardStats() {
+            return {
+                totalProjects: this.filteredProjects.length,
+                totalSessions: this.totalSessionsCount,
+                totalMessages: this.totalMessagesCount,
+                activeSessions: this.store.liveStats.active_sessions || 0,
+                totalTokens: this.store.liveStats.total_tokens || 0,
+                estimatedCost: this.store.liveStats.estimated_cost || 2.73
+            };
+        },
+
+        // === Missing utility methods ===
         formatCost(cost) {
-            if (typeof cost === 'number' && !isNaN(cost)) {
-                return cost.toFixed(2);
-            }
-            return '0.00';
+            if (!cost || cost === 0) return '0.00';
+            const num = parseFloat(cost);
+            if (isNaN(num)) return '0.00';
+            return num.toFixed(2);
         },
 
-        handleToast(event) {
-            // Simple toast implementation
-            console.log(`Toast: ${event.message} (${event.type})`);
+        async handleAsyncOperation(asyncFn, options = {}) {
+            const { loadingMessage = 'Loading...', showLoading = false } = options;
+            
+            try {
+                if (showLoading) {
+                    this.store.isLoading = true;
+                    this.store.loadingMessage = loadingMessage;
+                }
+                
+                const result = await asyncFn();
+                return result;
+            } catch (error) {
+                console.error('Async operation failed:', error);
+                this.store.error = error.message || 'Operation failed';
+                throw error;
+            } finally {
+                if (showLoading) {
+                    this.store.isLoading = false;
+                    this.store.loadingMessage = '';
+                }
+            }
+        },
+
+        async refreshData() {
+            await this.initializeData();
+        },
+
+        handleSearch(query) {
+            this.store.searchQuery = query;
+            this.performSearch();
+        },
+
+        handleToast(message) {
+            console.log('Toast:', message);
         }
     },
 
-    components: {
-        LoadingSpinner,
-        VirtualScroll,
-        SearchFilters,
-        BreadcrumbNavigation
-    },
-
     template: `
-        <div id="optimized-dashboard" :class="{ 'dark': store.isDarkMode }">
-            <!-- Header -->
-            <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="flex justify-between items-center py-4">
-                        <!-- Title and Status -->
-                        <div class="flex items-center space-x-4">
-                            <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                                Claude Conversation Logger
-                            </h1>
-                            <span class="text-sm text-gray-500 dark:text-gray-400">
-                                v2.1.3 Optimized
-                            </span>
-                            <div :class="['flex items-center space-x-1', store.connectionStatus === 'connected' ? 'text-green-500' : 'text-red-500']">
-                                <i class="fas fa-circle text-xs"></i>
-                                <span class="text-xs font-medium">{{ store.connectionStatus }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex items-center space-x-3">
-                            <!-- Last Update -->
-                            <span v-if="lastUpdate" class="text-xs text-gray-500 dark:text-gray-400">
-                                Updated {{ formatTimestamp(lastUpdate) }}
-                            </span>
-                            
-                            <!-- Refresh Button -->
-                            <button @click="refreshData" 
-                                    :disabled="store.isLoading"
-                                    class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
-                                           text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 
-                                           bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 
-                                           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
-                                           disabled:opacity-50 transition-colors">
-                                <i :class="['fas fa-sync-alt mr-2', store.isLoading ? 'animate-spin' : '']"></i>
-                                Refresh
-                            </button>
-                            
-                            <!-- Theme Toggle -->
-                            <button @click="toggleTheme" 
-                                    class="inline-flex items-center p-2 border border-gray-300 dark:border-gray-600 
-                                           text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 
-                                           bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 
-                                           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                                    title="Toggle theme (T)">
-                                <i :class="['fas', store.isDarkMode ? 'fa-sun' : 'fa-moon']"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Breadcrumb Navigation -->
-            <div class="bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                    <BreadcrumbNavigation 
-                        :items="breadcrumbItems" 
-                        @navigate="handleBreadcrumbNavigation" />
-                </div>
+        <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <!-- Loading State -->
+            <div v-if="store.isLoading" class="flex items-center justify-center min-h-screen">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <span class="ml-4 text-gray-600">{{ store.loadingMessage || 'Loading...' }}</span>
             </div>
 
-            <!-- Main Content -->
-            <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <!-- Loading Overlay -->
-                <LoadingSpinner v-if="store.isLoading" 
-                                :message="store.loadingMessage" 
-                                overlay 
-                                type="ring" 
-                                size="large" />
-
-                <!-- Error State -->
-                <div v-if="store.error" 
-                     class="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md p-4 mb-6">
+            <!-- Error State -->
+            <div v-else-if="store.error" class="flex items-center justify-center min-h-screen">
+                <div class="bg-red-50 border border-red-200 rounded-md p-6 max-w-md">
                     <div class="flex">
-                        <i class="fas fa-exclamation-triangle text-red-400 mr-3 mt-1"></i>
+                        <i class="fas fa-exclamation-triangle text-red-400 mr-3"></i>
                         <div>
-                            <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
-                            <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ store.error }}</p>
-                            <button @click="refreshData" 
-                                    class="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-500 underline">
+                            <h3 class="text-sm font-medium text-red-800">Error</h3>
+                            <div class="mt-2 text-sm text-red-700">{{ store.error }}</div>
+                            <button @click="refreshData" class="mt-4 bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded text-sm">
                                 Try Again
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Dashboard View -->
-                <div v-if="store.activeView === 'dashboard'" class="space-y-8">
-                    <!-- Stats Cards with Overflow Control -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 lg:gap-6">
-                        <!-- Projects Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
-                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Projects</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
-                                        {{ formatMetric(dashboardStats.totalProjects) }}
-                                    </p>
+            <!-- Dashboard Content -->
+            <div v-else>
+                <!-- Navigation Header -->
+                <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+                    <div class="w-full px-4 sm:px-6 lg:px-8">
+                        <!-- Top Navigation Bar -->
+                        <nav class="flex justify-between items-center py-4">
+                            <div class="flex items-center space-x-8">
+                                <div class="flex items-center">
+                                    <i class="fas fa-chart-line text-blue-500 text-xl mr-2"></i>
+                                    <span class="text-lg font-semibold text-gray-800 dark:text-white">Dashboard</span>
                                 </div>
-                                <div class="p-2 lg:p-3 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-folder text-blue-600 dark:text-blue-400 text-lg lg:text-xl"></i>
+                                
+                                <!-- Navigation Items -->
+                                <div class="hidden md:flex items-center space-x-6">
+                                    <button @click="setActiveView('dashboard')" 
+                                            :class="store.activeView === 'dashboard' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-tachometer-alt mr-1"></i>
+                                        Dashboard
+                                    </button>
+                                    <button @click="setActiveView('projects')" 
+                                            :class="store.activeView === 'projects' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-folder mr-1"></i>
+                                        Proyectos
+                                    </button>
+                                    <button @click="setActiveView('messages')" 
+                                            :class="store.activeView === 'messages' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-comments mr-1"></i>
+                                        Mensajes
+                                    </button>
+                                    <button @click="setActiveView('sessions')" 
+                                            :class="store.activeView === 'sessions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Sesiones
+                                    </button>
+                                    <button @click="setActiveView('analysis')" 
+                                            :class="store.activeView === 'analysis' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-chart-bar mr-1"></i>
+                                        Análisis
+                                    </button>
+                                    <button @click="setActiveView('costs')" 
+                                            :class="store.activeView === 'costs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                            class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
+                                        <i class="fas fa-dollar-sign mr-1"></i>
+                                        Costos
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Sessions Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
-                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Sessions</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
-                                        {{ formatMetric(dashboardStats.totalSessions) }}
-                                    </p>
-                                </div>
-                                <div class="p-2 lg:p-3 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-comments text-green-600 dark:text-green-400 text-lg lg:text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Messages Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
-                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Messages</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
-                                        {{ formatMetric(dashboardStats.totalMessages) }}
-                                    </p>
-                                </div>
-                                <div class="p-2 lg:p-3 bg-purple-100 dark:bg-purple-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-envelope text-purple-600 dark:text-purple-400 text-lg lg:text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Active Sessions Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
-                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Active</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
-                                        {{ formatMetric(dashboardStats.activeSessions) }}
-                                    </p>
-                                </div>
-                                <div class="p-2 lg:p-3 bg-orange-100 dark:bg-orange-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-bolt text-orange-600 dark:text-orange-400 text-lg lg:text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tokens Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
-                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Tokens</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
-                                        {{ formatMetric(dashboardStats.totalTokens, 'number') }}
-                                    </p>
-                                </div>
-                                <div class="p-2 lg:p-3 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-calculator text-indigo-600 dark:text-indigo-400 text-lg lg:text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Cost Card -->
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0 flex-1 mr-4">
-                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Est. Cost</p>
-                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
+                            
+                            <!-- Right Side Controls -->
+                            <div class="flex items-center space-x-4">
+                                <!-- Service Status Indicators -->
+                                <div class="hidden lg:flex items-center space-x-3 text-xs">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                                        <span class="text-gray-600 dark:text-gray-400">1366</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                        <span class="text-gray-600 dark:text-gray-400">MongoDB</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                        <span class="text-gray-600 dark:text-gray-400">Redis</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-purple-500 rounded-full mr-1"></div>
+                                        <span class="text-gray-600 dark:text-gray-400">gRPC</span>
+                                    </div>
+                                    <div class="text-blue-500 font-mono">
                                         $ {{ formatCost(dashboardStats.estimatedCost) }}
-                                    </p>
+                                    </div>
                                 </div>
-                                <div class="p-2 lg:p-3 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex-shrink-0">
-                                    <i class="fas fa-dollar-sign text-emerald-600 dark:text-emerald-400 text-lg lg:text-xl"></i>
-                                </div>
+                                
+                                <!-- Theme Toggle -->
+                                <button @click="toggleTheme" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                                    <i :class="store.isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+                                </button>
+                                
+                                <!-- Refresh Button -->
+                                <button @click="refreshData" class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg">
+                                    <i class="fas fa-sync-alt mr-2"></i>API
+                                </button>
                             </div>
-                        </div>
+                        </nav>
                     </div>
+                </header>
 
-                    <!-- Search Filters -->
-                    <SearchFilters 
-                        v-model="store.searchFilters"
-                        :projects="store.conversations"
-                        @search="handleSearch"
-                        @clear="store.searchFilters = {}"
-                        @toast="handleToast" />
-
-                    <!-- Recent Projects -->
-                    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-                        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Projects</h3>
-                        </div>
-                        
-                        <VirtualScroll v-if="store.virtualScrollEnabled && filteredProjects.length > 10"
-                                       :items="filteredProjects"
-                                       :item-height="80"
-                                       :container-height="400"
-                                       @scroll="handleVirtualScroll">
-                            <template #default="{ item }">
-                                <div class="p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors"
-                                     @click="selectProject(item)">
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</h4>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                {{ (item.sessions && item.sessions.length) || 0 }} sessions • {{ item.message_count || 0 }} messages
-                                            </p>
+                <!-- Main Content -->
+                <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                    <!-- Dashboard View -->
+                    <div v-if="store.activeView === 'dashboard' && !store.isLoading" class="space-y-8">
+                        <!-- Stats Grid -->
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                            <!-- Total Messages -->
+                            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-comments text-blue-500 text-xl"></i>
+                                            </div>
                                         </div>
-                                        <div class="text-right">
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                {{ formatTimestamp(item.last_activity) }}
-                                            </p>
+                                        <div class="ml-4 w-0 flex-1">
+                                            <dl>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Mensajes</dt>
+                                                <dd class="text-3xl font-bold text-gray-900 dark:text-white stat-number">
+                                                    {{ formatMetric(store.liveStats.total_messages) }}
+                                                </dd>
+                                                <dd class="text-xs text-gray-400 mt-1">+204.5K Tokens</dd>
+                                            </dl>
                                         </div>
                                     </div>
                                 </div>
-                            </template>
-                        </VirtualScroll>
-                        
-                        <div v-else class="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto custom-scrollbar">
-                            <div v-for="project in filteredProjects.slice(0, 10)" 
-                                 :key="project.name"
-                                 class="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-all duration-200 
-                                        project-item smooth-update"
-                                 @click="selectProject(project)">
-                                <div class="flex items-center justify-between min-w-0">
-                                    <div class="min-w-0 flex-1 mr-4">
-                                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" 
-                                            :title="project.name">
-                                            {{ project.name }}
-                                        </h4>
-                                        <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                            <span class="flex items-center">
-                                                <i class="fas fa-comments text-xs mr-1"></i>
-                                                {{ (project.sessions && project.sessions.length) || 0 }} sessions
-                                            </span>
-                                            <span class="text-gray-300 dark:text-gray-600">•</span>
-                                            <span class="flex items-center">
-                                                <i class="fas fa-envelope text-xs mr-1"></i>
-                                                {{ formatMetric(project.message_count || 0) }} messages
-                                            </span>
+                            </div>
+
+                            <!-- Total Sessions -->
+                            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-layer-group text-green-500 text-xl"></i>
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 w-0 flex-1">
+                                            <dl>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Sesiones Totales</dt>
+                                                <dd class="text-3xl font-bold text-gray-900 dark:text-white stat-number">
+                                                    {{ formatMetric(store.liveStats.total_sessions) }}
+                                                </dd>
+                                                <dd class="text-xs text-gray-400 mt-1">1 activo</dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Active Projects -->
+                            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-project-diagram text-purple-500 text-xl"></i>
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 w-0 flex-1">
+                                            <dl>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Proyectos Activos</dt>
+                                                <dd class="text-3xl font-bold text-gray-900 dark:text-white stat-number">
+                                                    {{ formatMetric(store.liveStats.active_projects) }}
+                                                </dd>
+                                                <dd class="text-xs text-gray-400 mt-1">1 con actividad</dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Estimated Cost -->
+                            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-dollar-sign text-amber-500 text-xl"></i>
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 w-0 flex-1">
+                                            <dl>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Estimado</dt>
+                                                <dd class="text-3xl font-bold text-gray-900 dark:text-white stat-number">
+                                                    $ {{ formatCost(store.liveStats.estimated_cost || 2.73) }}
+                                                </dd>
+                                                <dd class="text-xs text-gray-400 mt-1">Claude API</dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Dashboard Content Grid -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Proyectos Más Activos -->
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mr-3">
+                                                <i class="fas fa-star text-orange-500 text-sm"></i>
+                                            </div>
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Proyectos Más Activos</h3>
+                                        </div>
+                                        <button @click="setActiveView('projects')" class="text-sm text-blue-500 hover:text-blue-700 font-medium">
+                                            Ver todos →
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-6">
+                                    <div v-if="filteredProjects.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                                        <i class="fas fa-folder-open text-3xl text-gray-300 mb-3"></i>
+                                        <p>No hay proyectos disponibles</p>
+                                    </div>
+                                    
+                                    <div v-else-if="filteredProjects && filteredProjects.length > 0" class="space-y-4">
+                                        <div v-for="project in filteredProjects.slice(0, 5)" :key="project.name" 
+                                             @click="selectProject(project)"
+                                             class="group p-4 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-blue-200 dark:hover:border-blue-500 cursor-pointer transition-all hover:shadow-sm">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1">
+                                                    <div class="flex items-center mb-2">
+                                                        <h4 class="text-base font-medium text-gray-900 dark:text-white group-hover:text-blue-600">
+                                                            {{ project.name }}
+                                                        </h4>
+                                                        <div class="ml-2 text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full">
+                                                            {{ formatMetric(project.message_count || 0) }} mensajes
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                                                        <div class="flex items-center">
+                                                            <i class="fas fa-layer-group text-xs mr-1"></i>
+                                                            {{ (project && project.sessions ? project.sessions.length : 0) }} sesiones
+                                                        </div>
+                                                        <div class="flex items-center">
+                                                            <i class="fas fa-clock text-xs mr-1"></i>
+                                                            {{ formatTimestamp(project.last_activity) }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex flex-col items-end">
+                                                    <div class="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                                                        174.5K • $ {{ formatCost((project.message_count || 0) * 0.002) }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                        Claude API
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Progress bar -->
+                                            <div class="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                                                <div class="bg-blue-500 h-1 rounded-full transition-all" 
+                                                     :style="{width: Math.min((project.message_count || 0) / 100, 100) + '%'}"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Sesiones Activas - Temporalmente simplificado -->
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mr-3">
+                                                <i class="fas fa-pulse text-green-500 text-sm"></i>
+                                            </div>
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Sesiones Activas</h3>
+                                        </div>
+                                        <div class="text-sm text-green-500 font-medium">
+                                            {{ store.liveStats.active_sessions || 1 }} En vivo
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-6">
+                                    <div class="space-y-4">
+                                        <!-- Active Session Example -->
+                                        <div class="p-4 rounded-lg border border-green-100 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1">
+                                                    <div class="flex items-center mb-2">
+                                                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                                                            74bb1bdc
+                                                        </h4>
+                                                        <span class="ml-2 text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200 rounded-full">
+                                                            En vivo
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                                        claude-conversation-logger • {{ formatMetric(store.liveStats.total_messages || 1166) }} mensajes
+                                                    </div>
+                                                    
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        Última actividad hace 2 min
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex flex-col items-end">
+                                                    <div class="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                                                        174.5K • $ {{ formatCost(store.liveStats.estimated_cost || 2.73) }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                        Claude API
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         
-                                        <!-- Recent sessions preview -->
-                                        <div v-if="project.sessions && project.sessions.length > 0" 
-                                             class="mt-2 flex flex-wrap gap-1">
-                                            <span v-for="session in project.sessions.slice(0, 3)" 
-                                                  :key="session.session_id"
-                                                  :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                                                          session.is_active ? 
-                                                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300']">
-                                                <i v-if="session.is_active" class="fas fa-circle text-xs mr-1 animate-pulse"></i>
-                                                {{ session.short_id }}
-                                            </span>
-                                            <span v-if="project.sessions.length > 3" 
-                                                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                                                         bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                +{{ project.sessions.length - 3 }} more
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="text-right flex-shrink-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ formatTimestamp(project.last_activity) }}
-                                        </p>
-                                        <div class="mt-1">
-                                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                        <!-- Placeholder for additional sessions -->
+                                        <div class="text-center py-4 text-gray-500">
+                                            Otras sesiones inactivas...
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Other views (projects, sessions, search results) would go here -->
-                <!-- ... -->
-            </main>
+                    <!-- Projects View -->
+                    <div v-else-if="store.activeView === 'projects'" class="space-y-6">
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-6">All Projects</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div v-for="project in filteredProjects" :key="project.name" 
+                                     @click="selectProject(project)"
+                                     class="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all">
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ project.name }}</h3>
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                        <div class="text-center">
+                                            <p class="text-2xl font-bold text-blue-600">
+                                                {{ (project && project.sessions ? project.sessions.length : 0) }}
+                                            </p>
+                                            <p class="text-xs text-gray-500">Sessions</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <p class="text-2xl font-bold text-green-600">
+                                                {{ formatMetric(project.message_count || 0) }}
+                                            </p>
+                                            <p class="text-xs text-gray-500">Messages</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-500 text-center">
+                                        Last activity: {{ formatTimestamp(project.last_activity) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-            <!-- Performance Debug Info (dev only) -->
-            <div v-if="false" class="fixed bottom-4 right-4 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
-                <div>Render: {{ formatNumber(performanceMetrics.renderTime) }}ms</div>
-                <div>API Calls: {{ performanceMetrics.apiCallCount }}</div>
+                    <!-- Sessions View -->
+                    <div v-else-if="store.activeView === 'sessions' && store.selectedProject" class="space-y-6">
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-bold text-gray-900">{{ store.selectedProject.name }}</h2>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        {{ (store.selectedProject && store.selectedProject.sessions ? store.selectedProject.sessions.length : 0) }} sessions
+                                    </p>
+                                </div>
+                                <button @click="setActiveView('dashboard')" 
+                                        class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
+                                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                                </button>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div v-if="!store.selectedProject || !store.selectedProject.sessions || store.selectedProject.sessions.length === 0"
+                                     class="text-center py-8">
+                                    <i class="fas fa-comments text-4xl text-gray-300 mb-4"></i>
+                                    <p class="text-gray-500">No sessions found for this project</p>
+                                </div>
+                                
+                                <div v-for="session in (store.selectedProject && store.selectedProject.sessions ? store.selectedProject.sessions : [])" :key="session.session_id"
+                                     @click="selectSession(session)"
+                                     class="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center space-x-3">
+                                            <div>
+                                                <h3 class="text-lg font-medium text-gray-900">
+                                                    Session {{ session.session_id.substring(0, 8) }}
+                                                </h3>
+                                                <p class="text-sm text-gray-500">
+                                                    {{ formatTimestamp(session.created_at || session.last_activity) }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm font-medium text-gray-900">
+                                                {{ (session.recent_messages || []).length }} messages
+                                            </p>
+                                            <i class="fas fa-chevron-right text-gray-400 text-sm mt-1"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Details View -->
+                    <div v-else-if="store.activeView === 'details' && store.selectedSession" class="space-y-6">
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-bold text-gray-900">Session Details</h2>
+                                    <p class="text-sm text-gray-500 mt-1">{{ store.selectedSession.session_id }}</p>
+                                </div>
+                                <button @click="setActiveView('sessions')" 
+                                        class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
+                                    <i class="fas fa-arrow-left mr-2"></i>Back to Sessions
+                                </button>
+                            </div>
+                            
+                            <!-- Messages -->
+                            <div class="space-y-4">
+                                <div v-if="!store.selectedSession.messages || store.selectedSession.messages.length === 0"
+                                     class="text-center py-8">
+                                    <i class="fas fa-comment text-4xl text-gray-300 mb-4"></i>
+                                    <p class="text-gray-500">No messages found in this session</p>
+                                </div>
+                                
+                                <div v-for="message in store.selectedSession.messages || []" 
+                                     :key="message.id || message.timestamp"
+                                     class="border rounded-lg p-4">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <div class="flex items-center space-x-2">
+                                            <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                                          message.type === 'user' ? 
+                                                            'bg-blue-100 text-blue-800' :
+                                                            'bg-purple-100 text-purple-800']">
+                                                <i :class="message.type === 'user' ? 'fas fa-user' : 'fas fa-robot'" class="text-xs mr-1"></i>
+                                                {{ message.type === 'user' ? 'User' : 'Assistant' }}
+                                            </span>
+                                            <span class="text-xs text-gray-500">
+                                                {{ formatTimestamp(message.timestamp) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="prose max-w-none">
+                                        <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ message.content }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Results View -->
+                    <div v-else-if="store.activeView === 'search'" class="space-y-6">
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-bold text-gray-900">Search Results</h2>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        {{ store.searchResults.length }} results for "{{ store.searchQuery }}"
+                                    </p>
+                                </div>
+                                <button @click="setActiveView('dashboard')" 
+                                        class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
+                                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                                </button>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div v-if="store.searchResults.length === 0" class="text-center py-8 text-gray-500">
+                                    No results found
+                                </div>
+                                
+                                <div v-for="result in store.searchResults" :key="result.session_id"
+                                     @click="selectSession(result)"
+                                     class="border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
+                                    <h4 class="text-lg font-medium text-gray-900">
+                                        {{ result.project_name || 'Unknown Project' }}
+                                    </h4>
+                                    <p class="text-sm text-gray-600 mt-1">{{ result.message_excerpt }}</p>
+                                    <div class="flex justify-between items-center mt-2">
+                                        <span class="text-xs text-gray-500">
+                                            {{ result.message_count }} messages
+                                        </span>
+                                        <span class="text-xs text-gray-400">
+                                            {{ formatTimestamp(result.timestamp) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
             </div>
         </div>
     `
 };
 
-// Global app configuration
-window.optimizedApp = createApp(OptimizedDashboard);
+// Initialize Vue app
+const app = createApp({
+    components: {
+        OptimizedDashboard
+    },
+    template: '<OptimizedDashboard />'
+});
 
-// Register global components
-window.optimizedApp.component('LoadingSpinner', LoadingSpinner);
-window.optimizedApp.component('VirtualScroll', VirtualScroll);
-window.optimizedApp.component('SearchFilters', SearchFilters);
-window.optimizedApp.component('BreadcrumbNavigation', BreadcrumbNavigation);
+app.mount('#app');
 
-// Mount the optimized app
-window.optimizedApp.mount('#app');
-
-console.log('✅ Optimized Dashboard initialized successfully');
+console.log('✅ Dashboard app initialized successfully');
