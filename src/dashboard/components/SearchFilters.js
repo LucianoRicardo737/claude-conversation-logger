@@ -88,6 +88,32 @@ export const SearchFilters = {
                 });
             });
             return options;
+        },
+
+        // Limit project options to prevent UI overflow
+        limitedProjectOptions() {
+            const allOptions = this.projectOptions;
+            if (allOptions.length <= 21) { // 20 projects + "All Projects"
+                return allOptions;
+            }
+            
+            // Always include "All Projects" and currently selected project
+            const baseOptions = [allOptions[0]]; // "All Projects"
+            const remainingOptions = allOptions.slice(1);
+            
+            // If a project is selected, make sure it's included
+            const selectedOption = remainingOptions.find(opt => opt.value === this.localFilters.project);
+            if (selectedOption) {
+                baseOptions.push(selectedOption);
+            }
+            
+            // Add up to 19 more recent projects (or 20 if none selected)
+            const maxAdditional = selectedOption ? 19 : 20;
+            const otherOptions = remainingOptions
+                .filter(opt => opt.value !== this.localFilters.project)
+                .slice(0, maxAdditional);
+            
+            return baseOptions.concat(otherOptions);
         }
     },
 
@@ -245,22 +271,36 @@ export const SearchFilters = {
             <transition name="accordion" mode="out-in">
                 <div v-if="isAdvancedOpen" class="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-750 transition-all duration-300 ease-in-out">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Project Filter -->
+                    <!-- Project Filter with Overflow Control -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Project
                         </label>
-                        <select v-model="localFilters.project" 
-                                @change="onFilterChange"
-                                class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
-                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 
-                                       focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option v-for="option in projectOptions" 
-                                    :key="option.value" 
-                                    :value="option.value">
-                                {{ option.label }}
-                            </option>
-                        </select>
+                        <div class="relative max-w-xs">
+                            <select v-model="localFilters.project" 
+                                    @change="onFilterChange"
+                                    class="block w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-md 
+                                           bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 
+                                           focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                                           transition-all duration-200 ease-in-out truncate
+                                           max-h-10 overflow-hidden">
+                                <option v-for="option in limitedProjectOptions" 
+                                        :key="option.value" 
+                                        :value="option.value"
+                                        :title="option.label">
+                                    {{ option.label }}
+                                </option>
+                            </select>
+                            <!-- Dropdown indicator -->
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- Show project count if many -->
+                        <p v-if="projects.length > 20" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Showing first 20 of {{ projects.length }} projects
+                        </p>
                     </div>
 
                     <!-- Message Type Filter -->

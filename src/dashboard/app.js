@@ -271,7 +271,7 @@ const OptimizedDashboard = {
 
     computed: {
         filteredProjects() {
-            if (!this.store.conversations?.length) return [];
+            if (!this.store.conversations || !this.store.conversations.length) return [];
             
             // Create hash for current state to enable memoization
             const conversationsLength = this.store.conversations.length;
@@ -306,20 +306,24 @@ const OptimizedDashboard = {
 
         activeProjects() {
             return this.filteredProjects.filter(project => 
-                project.sessions?.some(session => session.is_active)
+                project.sessions && project.sessions.some(session => session.is_active)
             );
         },
 
         recentSessions() {
             const sessions = [];
-            this.store.conversations?.forEach(project => {
-                project.sessions?.forEach(session => {
-                    sessions.push({
-                        ...session,
-                        project_name: project.name
-                    });
+            if (this.store.conversations) {
+                this.store.conversations.forEach(project => {
+                    if (project.sessions) {
+                        project.sessions.forEach(session => {
+                            sessions.push({
+                                ...session,
+                                project_name: project.name
+                            });
+                        });
+                    }
                 });
-            });
+            }
             
             return sessions
                 .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity))
@@ -328,17 +332,26 @@ const OptimizedDashboard = {
 
         dashboardStats() {
             const conversations = this.store.conversations || [];
-            const totalSessions = conversations.reduce((sum, p) => sum + (p.sessions?.length || 0), 0);
+            const totalSessions = conversations.reduce((sum, p) => sum + ((p.sessions && p.sessions.length) || 0), 0);
             const totalMessages = conversations.reduce((sum, p) => sum + (p.message_count || 0), 0);
             const activeSessions = conversations.reduce((sum, p) => 
-                sum + (p.sessions?.filter(s => s.is_active)?.length || 0), 0
+                sum + ((p.sessions && p.sessions.filter(s => s.is_active) && p.sessions.filter(s => s.is_active).length) || 0), 0
             );
+
+            // Calculate token usage and costs from message metadata
+            const totalTokens = this.calculateTotalTokens();
+            const estimatedCost = this.calculateEstimatedCost();
+            const avgMessagesPerSession = totalSessions > 0 ? Math.round(totalMessages / totalSessions) : 0;
 
             return {
                 totalProjects: conversations.length,
                 totalSessions,
                 totalMessages,
-                activeSessions
+                activeSessions,
+                totalTokens,
+                estimatedCost,
+                avgMessagesPerSession,
+                lastUpdate: Date.now()
             };
         }
     },
@@ -379,6 +392,51 @@ const OptimizedDashboard = {
     },
 
     methods: {
+        // Calculate total tokens from all conversations
+        calculateTotalTokens() {
+            const conversations = this.store.conversations || [];
+            let totalTokens = 0;
+            
+            conversations.forEach(project => {
+                if (project.sessions) {
+                    project.sessions.forEach(session => {
+                        if (session.recent_messages) {
+                            session.recent_messages.forEach(message => {
+                                if (message.metadata && message.metadata.usage) {
+                                    const usage = message.metadata.usage;
+                                    totalTokens += (usage.input_tokens || 0) + (usage.output_tokens || 0);
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            return totalTokens;
+        },
+
+        // Calculate estimated cost from token usage
+        calculateEstimatedCost() {
+            const conversations = this.store.conversations || [];
+            let totalCost = 0;
+            
+            conversations.forEach(project => {
+                if (project.sessions) {
+                    project.sessions.forEach(session => {
+                        if (session.recent_messages) {
+                            session.recent_messages.forEach(message => {
+                                if (message.metadata && message.metadata.cost_usd) {
+                                    totalCost += parseFloat(message.metadata.cost_usd) || 0;
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            return totalCost;
+        },
+
         /**
          * Smart merge of conversation data to prevent flickering
          */
@@ -434,7 +492,7 @@ const OptimizedDashboard = {
             // If no significant changes, return existing reference to prevent re-render
             if (existing.message_count === newData.message_count &&
                 existing.last_activity === newData.last_activity &&
-                existing.sessions?.length === newData.sessions?.length) {
+                (existing.sessions && existing.sessions.length) === (newData.sessions && newData.sessions.length)) {
                 return existing;
             }
 
@@ -504,7 +562,7 @@ const OptimizedDashboard = {
                 this.performanceMetrics.renderTime = performance.now() - startTime;
                 this.lastUpdate = new Date();
                 
-                console.log(`✅ Dashboard loaded in ${this.performanceMetrics.renderTime.toFixed(2)}ms`);
+                console.log(`✅ Dashboard loaded in ${(this.performanceMetrics.renderTime || 0).toFixed(2)}ms`);
             }, { 
                 loadingMessage: 'Loading dashboard...',
                 showLoading: true 
@@ -656,11 +714,33 @@ const OptimizedDashboard = {
         },
 
         updateLiveStats(stats) {
-            // Update live statistics from gRPC stream
+            // Update live statistics from gRPC stream with animation
+            const oldStats = { ...this.store.liveStats };
             this.store.liveStats = {
                 ...this.store.liveStats,
                 ...stats
             };
+            
+            // Trigger stat update animations
+            this.triggerStatAnimations(oldStats, this.store.liveStats);
+        },
+
+        triggerStatAnimations(oldStats, newStats) {
+            // Animate stat cards that have changed
+            nextTick(() => {
+                const statsToCheck = ['total_messages', 'total_sessions', 'active_sessions'];
+                
+                statsToCheck.forEach(stat => {
+                    if (oldStats[stat] !== newStats[stat]) {
+                        // Find the corresponding stat card and animate it
+                        const statCards = document.querySelectorAll('.stat-number');
+                        statCards.forEach(card => {
+                            card.classList.add('stat-update');
+                            setTimeout(() => card.classList.remove('stat-update'), 600);
+                        });
+                    }
+                });
+            });
         },
 
         async refreshData() {
@@ -789,9 +869,10 @@ const OptimizedDashboard = {
         startPerformanceMonitoring() {
             // Monitor API calls
             const originalRequest = apiService.request;
-            apiService.request = async (...args) => {
-                this.performanceMetrics.apiCallCount++;
-                return originalRequest.apply(apiService, args);
+            const self = this;
+            apiService.request = async function() {
+                self.performanceMetrics.apiCallCount++;
+                return originalRequest.apply(apiService, arguments);
             };
         },
 
@@ -802,6 +883,26 @@ const OptimizedDashboard = {
                 return this.formatTimestamp(value);
             }
             return value;
+        },
+
+        formatNumber(num, options = {}) {
+            if (typeof num !== 'number') return '0';
+            
+            if (options.compact && num >= 1000) {
+                const units = ['', 'K', 'M', 'B'];
+                const unitIndex = Math.floor(Math.log10(Math.abs(num)) / 3);
+                const scaledNum = num / Math.pow(1000, unitIndex);
+                return scaledNum.toFixed(1) + units[unitIndex];
+            }
+            
+            return num.toLocaleString();
+        },
+
+        formatCost(cost) {
+            if (typeof cost === 'number' && !isNaN(cost)) {
+                return cost.toFixed(2);
+            }
+            return '0.00';
         },
 
         handleToast(event) {
@@ -906,60 +1007,99 @@ const OptimizedDashboard = {
 
                 <!-- Dashboard View -->
                 <div v-if="store.activeView === 'dashboard'" class="space-y-8">
-                    <!-- Stats Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                    <!-- Stats Cards with Overflow Control -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 lg:gap-6">
+                        <!-- Projects Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
+                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
                             <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Projects</p>
-                                    <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Projects</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
                                         {{ formatMetric(dashboardStats.totalProjects) }}
                                     </p>
                                 </div>
-                                <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                                    <i class="fas fa-folder text-blue-600 dark:text-blue-400 text-xl"></i>
+                                <div class="p-2 lg:p-3 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-folder text-blue-600 dark:text-blue-400 text-lg lg:text-xl"></i>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                        <!-- Sessions Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
+                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
                             <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Sessions</p>
-                                    <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Sessions</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
                                         {{ formatMetric(dashboardStats.totalSessions) }}
                                     </p>
                                 </div>
-                                <div class="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                                    <i class="fas fa-comments text-green-600 dark:text-green-400 text-xl"></i>
+                                <div class="p-2 lg:p-3 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-comments text-green-600 dark:text-green-400 text-lg lg:text-xl"></i>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                        <!-- Messages Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
+                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
                             <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Messages</p>
-                                    <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Messages</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
                                         {{ formatMetric(dashboardStats.totalMessages) }}
                                     </p>
                                 </div>
-                                <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                                    <i class="fas fa-envelope text-purple-600 dark:text-purple-400 text-xl"></i>
+                                <div class="p-2 lg:p-3 bg-purple-100 dark:bg-purple-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-envelope text-purple-600 dark:text-purple-400 text-lg lg:text-xl"></i>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                        <!-- Active Sessions Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
+                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
                             <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Sessions</p>
-                                    <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Active</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
                                         {{ formatMetric(dashboardStats.activeSessions) }}
                                     </p>
                                 </div>
-                                <div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
-                                    <i class="fas fa-bolt text-orange-600 dark:text-orange-400 text-xl"></i>
+                                <div class="p-2 lg:p-3 bg-orange-100 dark:bg-orange-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-bolt text-orange-600 dark:text-orange-400 text-lg lg:text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tokens Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm 
+                                    hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
+                            <div class="flex items-center justify-between">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Tokens</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
+                                        {{ formatMetric(dashboardStats.totalTokens, 'number') }}
+                                    </p>
+                                </div>
+                                <div class="p-2 lg:p-3 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-calculator text-indigo-600 dark:text-indigo-400 text-lg lg:text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cost Card -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 lg:p-6 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden max-w-full stat-card">
+                            <div class="flex items-center justify-between">
+                                <div class="min-w-0 flex-1 mr-4">
+                                    <p class="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Est. Cost</p>
+                                    <p class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 stat-number">
+                                        $ {{ formatCost(dashboardStats.estimatedCost) }}
+                                    </p>
+                                </div>
+                                <div class="p-2 lg:p-3 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex-shrink-0">
+                                    <i class="fas fa-dollar-sign text-emerald-600 dark:text-emerald-400 text-lg lg:text-xl"></i>
                                 </div>
                             </div>
                         </div>
@@ -991,7 +1131,7 @@ const OptimizedDashboard = {
                                         <div>
                                             <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</h4>
                                             <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                {{ item.sessions?.length || 0 }} sessions • {{ item.message_count || 0 }} messages
+                                                {{ (item.sessions && item.sessions.length) || 0 }} sessions • {{ item.message_count || 0 }} messages
                                             </p>
                                         </div>
                                         <div class="text-right">
@@ -1004,22 +1144,56 @@ const OptimizedDashboard = {
                             </template>
                         </VirtualScroll>
                         
-                        <div v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <div v-else class="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto custom-scrollbar">
                             <div v-for="project in filteredProjects.slice(0, 10)" 
                                  :key="project.name"
-                                 class="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors"
+                                 class="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-all duration-200 
+                                        project-item smooth-update"
                                  @click="selectProject(project)">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ project.name }}</h4>
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                                            {{ project.sessions?.length || 0 }} sessions • {{ project.message_count || 0 }} messages
-                                        </p>
+                                <div class="flex items-center justify-between min-w-0">
+                                    <div class="min-w-0 flex-1 mr-4">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" 
+                                            :title="project.name">
+                                            {{ project.name }}
+                                        </h4>
+                                        <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            <span class="flex items-center">
+                                                <i class="fas fa-comments text-xs mr-1"></i>
+                                                {{ (project.sessions && project.sessions.length) || 0 }} sessions
+                                            </span>
+                                            <span class="text-gray-300 dark:text-gray-600">•</span>
+                                            <span class="flex items-center">
+                                                <i class="fas fa-envelope text-xs mr-1"></i>
+                                                {{ formatMetric(project.message_count || 0) }} messages
+                                            </span>
+                                        </div>
+                                        
+                                        <!-- Recent sessions preview -->
+                                        <div v-if="project.sessions && project.sessions.length > 0" 
+                                             class="mt-2 flex flex-wrap gap-1">
+                                            <span v-for="session in project.sessions.slice(0, 3)" 
+                                                  :key="session.session_id"
+                                                  :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                                                          session.is_active ? 
+                                                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300']">
+                                                <i v-if="session.is_active" class="fas fa-circle text-xs mr-1 animate-pulse"></i>
+                                                {{ session.short_id }}
+                                            </span>
+                                            <span v-if="project.sessions.length > 3" 
+                                                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                                                         bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                +{{ project.sessions.length - 3 }} more
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="text-right">
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    <div class="text-right flex-shrink-0">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
                                             {{ formatTimestamp(project.last_activity) }}
                                         </p>
+                                        <div class="mt-1">
+                                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1033,7 +1207,7 @@ const OptimizedDashboard = {
 
             <!-- Performance Debug Info (dev only) -->
             <div v-if="false" class="fixed bottom-4 right-4 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
-                <div>Render: {{ performanceMetrics.renderTime.toFixed(2) }}ms</div>
+                <div>Render: {{ formatNumber(performanceMetrics.renderTime) }}ms</div>
                 <div>API Calls: {{ performanceMetrics.apiCallCount }}</div>
             </div>
         </div>

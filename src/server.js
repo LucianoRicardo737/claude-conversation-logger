@@ -15,7 +15,7 @@ import {
 import MongoDBAgentExtension from './database/mongodb-agent-extension.js';
 import RedisManager from './database/redis.js';
 import ConversationService from './services/conversationService.js';
-import { getGrpcServer } from './grpc/grpc-server.js';
+import { getOptimizedGrpcServer } from './grpc/grpc-server.js';
 import { injectDependencies } from './grpc/grpc-handlers.js';
 import { AgentSystemFactory } from './agents/index.js';
 
@@ -748,7 +748,7 @@ class OptimizedServer {
 
     async startGrpcServer() {
         try {
-            this.grpcServer = getGrpcServer();
+            this.grpcServer = getOptimizedGrpcServer();
             const grpcPort = process.env.GRPC_PORT || 50051;
             this.grpcServer.start(grpcPort);
             console.log(`📡 gRPC server started on port ${grpcPort}`);
