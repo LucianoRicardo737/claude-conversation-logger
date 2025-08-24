@@ -1,8 +1,15 @@
 import { getGrpcServer } from './grpc-server.js';
+import os from 'os';
 
 // Referencias externas que se inyectarán desde server.js
 let messagesCollection = null;
 let redisClient = null;
+
+// Active streams management
+const activeStreams = new Map();
+const activeSessionStreams = new Set();
+const metricsStreams = new Set();
+const updateStreams = new Map();
 
 // Inyectar dependencias desde el servidor principal
 export function injectDependencies(mongoCollection, redis) {
@@ -452,4 +459,281 @@ export function broadcastNewMessage(message) {
 export function broadcastStatsUpdate() {
     const grpcServer = getGrpcServer();
     // Se podría implementar broadcast de estadísticas aquí
+}
+
+// === NUEVOS HANDLERS PARA REEMPLAZAR WEBSOCKET ===
+
+/**
+ * Handler para streaming de sesiones activas en tiempo real
+ */
+export function handleStreamActiveSessions(call) {
+    console.log('📡 New client connected to active sessions stream');
+    activeSessionStreams.add(call);
+    
+    // Send initial active sessions
+    sendCurrentActiveSessions(call);
+    
+    // Handle client disconnect
+    call.on('cancelled', () => {
+        console.log('📡 Client disconnected from active sessions stream');
+        activeSessionStreams.delete(call);
+    });
+    
+    call.on('error', (error) => {
+        console.error('❌ Active sessions stream error:', error);
+        activeSessionStreams.delete(call);
+    });
+}
+
+/**
+ * Handler para suscripciones a actualizaciones específicas
+ */
+export function handleSubscribeToUpdates(call) {
+    console.log('📡 New client subscribed to updates');
+    const { type, project_filter, session_ids, filters } = call.request;
+    
+    // Store subscription details
+    const subscriptionId = generateSubscriptionId();
+    updateStreams.set(subscriptionId, {
+        call,
+        type,
+        project_filter,
+        session_ids: session_ids || [],
+        filters: filters || {}
+    });
+    
+    // Send confirmation
+    call.write({
+        type: 'subscription_confirmed',
+        session_id: subscriptionId,
+        project_name: project_filter || 'all',
+        message: null,
+        session_metadata: null,
+        timestamp: Date.now()
+    });
+    
+    // Handle client disconnect
+    call.on('cancelled', () => {
+        console.log('📡 Client unsubscribed from updates');
+        updateStreams.delete(subscriptionId);
+    });
+    
+    call.on('error', (error) => {
+        console.error('❌ Updates stream error:', error);
+        updateStreams.delete(subscriptionId);
+    });
+}
+
+/**
+ * Handler para broadcast de métricas del sistema
+ */
+export function handleBroadcastMetrics(call) {
+    console.log('📊 New client connected to metrics stream');
+    metricsStreams.add(call);
+    
+    // Send initial metrics
+    sendCurrentMetrics(call);
+    
+    // Start periodic metrics updates
+    const metricsInterval = setInterval(() => {
+        if (metricsStreams.has(call)) {
+            sendCurrentMetrics(call);
+        }
+    }, 5000); // Every 5 seconds
+    
+    // Handle client disconnect
+    call.on('cancelled', () => {
+        console.log('📊 Client disconnected from metrics stream');
+        metricsStreams.delete(call);
+        clearInterval(metricsInterval);
+    });
+    
+    call.on('error', (error) => {
+        console.error('❌ Metrics stream error:', error);
+        metricsStreams.delete(call);
+        clearInterval(metricsInterval);
+    });
+}
+
+/**
+ * Send current active sessions to client
+ */
+async function sendCurrentActiveSessions(call) {
+    try {
+        if (!messagesCollection) return;
+        
+        // Get sessions active in last 5 minutes
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        
+        const activeSessions = await messagesCollection.aggregate([
+            { $match: { created_at: { $gte: fiveMinutesAgo } } },
+            {
+                $group: {
+                    _id: '$session_id',
+                    project_name: { $first: '$project_name' },
+                    start_time: { $min: '$created_at' },
+                    last_activity: { $max: '$created_at' },
+                    message_count: { $sum: 1 },
+                    last_message: { $last: '$$ROOT' }
+                }
+            },
+            { $sort: { last_activity: -1 } },
+            { $limit: 20 }
+        ]).toArray();
+        
+        for (const session of activeSessions) {
+            const activeSession = {
+                session_id: session._id,
+                short_id: session._id.substring(0, 8),
+                project_name: session.project_name || 'unknown',
+                start_time: session.start_time.getTime(),
+                last_activity: session.last_activity.getTime(),
+                message_count: session.message_count,
+                duration_seconds: Math.floor((session.last_activity - session.start_time) / 1000),
+                is_marked: false, // TODO: Get from Redis
+                current_status: 'active',
+                active_tools: [], // TODO: Extract from recent messages
+                last_message: formatMessage(session.last_message)
+            };
+            
+            call.write({
+                type: 'session_started',
+                session: activeSession,
+                timestamp: Date.now()
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error sending active sessions:', error);
+    }
+}
+
+/**
+ * Send current system metrics to client
+ */
+function sendCurrentMetrics(call) {
+    try {
+        const cpus = os.cpus();
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const uptime = os.uptime();
+        
+        const metrics = {
+            type: 'system',
+            system: {
+                cpu_usage: getCpuUsage(), // Simplified - would need proper CPU monitoring
+                memory_usage: ((totalMem - freeMem) / totalMem) * 100,
+                active_connections: activeStreams.size + activeSessionStreams.size + metricsStreams.size,
+                uptime_seconds: uptime
+            },
+            performance: {
+                avg_response_time: 0, // TODO: Implement response time tracking
+                requests_per_second: 0, // TODO: Implement request rate tracking
+                error_rate: 0, // TODO: Implement error rate tracking
+                cache_hit_rate: redisClient ? 85.0 : 0 // Placeholder
+            },
+            database: {
+                total_documents: 0, // TODO: Get from MongoDB
+                documents_per_second: 0, // TODO: Implement tracking
+                avg_query_time: 0, // TODO: Implement query time tracking
+                active_connections: 1 // Simplified
+            },
+            cache: {
+                total_keys: 0, // TODO: Get from Redis
+                hit_rate: 85.0, // Placeholder
+                memory_usage_bytes: 0, // TODO: Get from Redis
+                ops_per_second: 0 // TODO: Implement tracking
+            },
+            timestamp: Date.now()
+        };
+        
+        call.write(metrics);
+        
+    } catch (error) {
+        console.error('❌ Error sending metrics:', error);
+    }
+}
+
+/**
+ * Simplified CPU usage calculation
+ */
+function getCpuUsage() {
+    const cpus = os.cpus();
+    let idle = 0;
+    let total = 0;
+    
+    cpus.forEach(cpu => {
+        for (let type in cpu.times) {
+            total += cpu.times[type];
+        }
+        idle += cpu.times.idle;
+    });
+    
+    return ((total - idle) / total) * 100;
+}
+
+/**
+ * Generate unique subscription ID
+ */
+function generateSubscriptionId() {
+    return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Broadcast active session update to all clients
+ */
+export function broadcastActiveSessionUpdate(type, session) {
+    const update = {
+        type,
+        session: session,
+        timestamp: Date.now()
+    };
+    
+    activeSessionStreams.forEach(call => {
+        try {
+            call.write(update);
+        } catch (error) {
+            console.error('❌ Error broadcasting session update:', error);
+            activeSessionStreams.delete(call);
+        }
+    });
+}
+
+/**
+ * Broadcast conversation update to subscribed clients
+ */
+export function broadcastConversationUpdate(type, sessionId, projectName, message = null, metadata = null) {
+    const update = {
+        type,
+        session_id: sessionId,
+        project_name: projectName,
+        message: message ? formatMessage(message) : null,
+        session_metadata: metadata,
+        timestamp: Date.now()
+    };
+    
+    // Send to relevant subscribers
+    updateStreams.forEach((subscription, subscriptionId) => {
+        const { call, project_filter, session_ids, filters } = subscription;
+        
+        // Check if update matches subscription filters
+        let shouldSend = true;
+        
+        if (project_filter && project_filter !== projectName) {
+            shouldSend = false;
+        }
+        
+        if (session_ids.length > 0 && !session_ids.includes(sessionId)) {
+            shouldSend = false;
+        }
+        
+        if (shouldSend) {
+            try {
+                call.write(update);
+            } catch (error) {
+                console.error('❌ Error broadcasting conversation update:', error);
+                updateStreams.delete(subscriptionId);
+            }
+        }
+    });
 }

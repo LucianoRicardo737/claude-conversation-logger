@@ -1,27 +1,60 @@
 #!/usr/bin/env python3
 """
-Claude Conversation Logger Hook - Production Ready
+Claude Conversation Logger Hook - Optimized Production Ready
 Captures complete conversations using Claude Code hooks and Triple Storage System.
 
 Features:
 - UserPromptSubmit: Captures user messages
 - Stop: Extracts assistant responses from transcript with improved token parsing
-- SessionStart: Logs session initialization  
+- SessionStart/SessionEnd: Logs session lifecycle
+- PreToolUse/PostToolUse: Tracks tool execution
 - Triple Storage: MongoDB (primary) → Redis (cache) → Memory (buffer)
 - Auto-failover and 90-day TTL
-- Improved Token Accuracy: Accumulates streaming response chunks for precise usage statistics
+- Duplicate Prevention: Prevents excessive logging within 5-second window
+- Token Tracking: OpenTelemetry compliant usage metrics (no pricing data)
 
-Version: 2.1 - Enhanced Token Parsing
+Version: 2.3 - Optimized with Duplicate Prevention
 """
 import json
 import sys
 import requests
 import os
+import time
+import hashlib
 from datetime import datetime
 
-# API Configuration
-API_BASE_URL = 'http://localhost:3003'
-API_KEY = 'claude_api_secret_2024_change_me'
+# API Configuration - Environment variables with fallbacks
+API_BASE_URL = os.environ.get('CLAUDE_LOGGER_URL', 'http://localhost:3003')
+API_KEY = os.environ.get('CLAUDE_LOGGER_API_KEY', 'claude_api_secret_2024_change_me')
+
+# Duplicate prevention cache (in memory, per process)
+_request_cache = {}
+_cache_timeout = 5  # seconds - prevent duplicates within 5 seconds
+
+def is_duplicate_request(data, hook_event):
+    """Check if this request is a duplicate within the cache timeout"""
+    current_time = time.time()
+    
+    # Clean expired cache entries
+    expired_keys = [k for k, v in _request_cache.items() if current_time - v > _cache_timeout]
+    for key in expired_keys:
+        del _request_cache[key]
+    
+    # Generate unique key for this request
+    key_data = {
+        'hook_event': hook_event,
+        'session_id': data.get('session_id', ''),
+        'content_hash': hashlib.md5(str(data.get('content', '')).encode()).hexdigest()[:8]
+    }
+    key = f"{key_data['hook_event']}:{key_data['session_id']}:{key_data['content_hash']}"
+    
+    # Check if we've seen this request recently
+    if key in _request_cache:
+        return True
+    
+    # Record this request
+    _request_cache[key] = current_time
+    return False
 
 def send_to_api(endpoint, data):
     """Send data to the logging API"""
@@ -77,31 +110,7 @@ def parse_usage_tokens(usage_data):
     
     return token_records
 
-def estimate_cost_usd(usage_data, model):
-    """Estimate cost in USD based on usage and model"""
-    if not usage_data or not isinstance(usage_data, dict):
-        return 0.0
-    
-    # Approximate pricing for Claude models (as of 2024)
-    # These are estimates - actual costs may vary
-    pricing = {
-        'claude-3-5-sonnet-20241022': {
-            'input': 0.000003,   # $3 per 1M tokens
-            'output': 0.000015,  # $15 per 1M tokens
-            'cache_read': 0.0000003,   # $0.30 per 1M tokens
-            'cache_write': 0.000003    # $3.75 per 1M tokens
-        }
-    }
-    
-    model_pricing = pricing.get(model, pricing['claude-3-5-sonnet-20241022'])
-    
-    total_cost = 0.0
-    total_cost += usage_data.get('input_tokens', 0) * model_pricing['input']
-    total_cost += usage_data.get('output_tokens', 0) * model_pricing['output']
-    total_cost += usage_data.get('cache_read_input_tokens', 0) * model_pricing['cache_read']
-    total_cost += usage_data.get('cache_creation_input_tokens', 0) * model_pricing['cache_write']
-    
-    return round(total_cost, 6)  # Round to 6 decimal places
+# Cost estimation removed - pricing data not needed for logging purposes
 
 def parse_transcript_for_last_assistant_message(transcript_path):
     """Parse transcript to extract the last assistant message with improved token parsing"""
@@ -181,10 +190,6 @@ def parse_transcript_for_last_assistant_message(transcript_path):
                         duration_ms = 0
                 
                 last_assistant_message['duration_ms'] = duration_ms
-                last_assistant_message['cost_usd'] = estimate_cost_usd(
-                    accumulated_usage, 
-                    last_assistant_message.get('model', '')
-                )
                     
     except Exception as e:
         print(f"Error parsing transcript: {e}", file=sys.stderr)
@@ -210,6 +215,12 @@ def main():
         except:
             sys.exit(0)  # API not available, exit silently
         
+        # Check for duplicates first (except for SessionStart/SessionEnd which should always be logged)
+        if hook_event not in ['SessionStart', 'SessionEnd']:
+            if is_duplicate_request(input_data, hook_event):
+                # This is a duplicate request within the timeout window
+                sys.exit(0)
+        
         # Handle different hook events
         if hook_event == 'Stop' and transcript_path:
             # Parse the transcript to get the last assistant message
@@ -228,7 +239,6 @@ def main():
                         'model': assistant_msg.get('model', 'unknown'),
                         'usage': assistant_msg.get('usage', {}),
                         'uuid': assistant_msg.get('uuid', ''),
-                        'cost_usd': assistant_msg.get('cost_usd', 0.0),
                         'duration_ms': assistant_msg.get('duration_ms', 0)
                     }
                 })
@@ -251,7 +261,6 @@ def main():
                                 'model': model,
                                 'token_type': token_record['type'],
                                 'token_count': token_record['token_count'],
-                                'cost_usd': assistant_msg.get('cost_usd', 0.0),
                                 'duration_ms': assistant_msg.get('duration_ms', 0),
                                 'uuid': assistant_msg.get('uuid', ''),
                                 'timestamp': assistant_msg.get('timestamp', '')
@@ -271,18 +280,57 @@ def main():
                 }
             })
             
+        elif hook_event == 'PreToolUse':
+            tool_name = input_data.get('tool_name', 'unknown')
+            tool_input = input_data.get('tool_input', {})
+            
+            # Create readable tool summary for pre-use
+            content = f"About to use tool: {tool_name}"
+            if tool_name == 'Bash':
+                command = tool_input.get('command', '')
+                content = f"Bash (preparing): {command[:100]}{'...' if len(command) > 100 else ''}"
+            elif tool_name in ['Edit', 'Write', 'Read', 'MultiEdit']:
+                file_path = tool_input.get('file_path', '')
+                content = f"{tool_name} (preparing): {file_path}"
+            elif tool_name in ['Grep', 'Glob']:
+                pattern = tool_input.get('pattern', '') or tool_input.get('query', '')
+                content = f"{tool_name} (preparing): {pattern[:50]}{'...' if len(pattern) > 50 else ''}"
+            
+            send_to_api('log', {
+                'session_id': session_id,
+                'project_name': project_name,
+                'hook_event': hook_event,
+                'message_type': 'tool_pre',
+                'content': content,
+                'metadata': {
+                    'tool_name': tool_name,
+                    'tool_input': tool_input,
+                    'source': 'tool_pre_hook'
+                }
+            })
+            
         elif hook_event == 'PostToolUse':
             tool_name = input_data.get('tool_name', 'unknown')
             tool_input = input_data.get('tool_input', {})
+            tool_output = input_data.get('tool_output', '')
             
             # Create readable tool summary
             content = f"Used tool: {tool_name}"
             if tool_name == 'Bash':
                 command = tool_input.get('command', '')
                 content = f"Bash: {command}"
-            elif tool_name in ['Edit', 'Write', 'Read']:
+            elif tool_name in ['Edit', 'Write', 'Read', 'MultiEdit']:
                 file_path = tool_input.get('file_path', '')
                 content = f"{tool_name}: {file_path}"
+            elif tool_name in ['Grep', 'Glob']:
+                pattern = tool_input.get('pattern', '') or tool_input.get('query', '')
+                content = f"{tool_name}: {pattern}"
+            elif tool_name.startswith('mcp__'):
+                # MCP tool usage
+                content = f"MCP Tool: {tool_name.replace('mcp__', '')}"
+            
+            # Track tool success/failure
+            tool_success = 'error' not in tool_output.lower() if tool_output else True
             
             send_to_api('log', {
                 'session_id': session_id,
@@ -293,6 +341,8 @@ def main():
                 'metadata': {
                     'tool_name': tool_name,
                     'tool_input': tool_input,
+                    'tool_success': tool_success,
+                    'output_length': len(str(tool_output)) if tool_output else 0,
                     'source': 'tool_hook'
                 }
             })
@@ -307,7 +357,37 @@ def main():
                 'content': f'Session started (source: {source})',
                 'metadata': {
                     'source': 'session_start_hook',
-                    'start_source': source
+                    'start_source': source,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+            })
+            
+        elif hook_event == 'SessionEnd':
+            source = input_data.get('source', 'unknown')
+            send_to_api('log', {
+                'session_id': session_id,
+                'project_name': project_name,
+                'hook_event': hook_event,
+                'message_type': 'system',
+                'content': f'Session ended (source: {source})',
+                'metadata': {
+                    'source': 'session_end_hook',
+                    'end_source': source,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+            })
+        
+        else:
+            # Handle unknown hooks gracefully
+            send_to_api('log', {
+                'session_id': session_id,
+                'project_name': project_name,
+                'hook_event': hook_event,
+                'message_type': 'system',
+                'content': f'Unknown hook event: {hook_event}',
+                'metadata': {
+                    'source': 'unknown_hook',
+                    'original_data': input_data
                 }
             })
         

@@ -1,33 +1,36 @@
 {
   "hooks": {
     "UserPromptSubmit": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 ~/.claude/hooks/api-logger.py"
-      }]
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/api-logger.py"
     }],
     "Stop": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 ~/.claude/hooks/api-logger.py"
-      }]
+      "type": "command", 
+      "command": "python3 ~/.claude/hooks/api-logger.py"
     }],
     "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 ~/.claude/hooks/api-logger.py"
-      }]
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/api-logger.py"
+    }],
+    "SessionEnd": [{
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/api-logger.py"
+    }],
+    "PreToolUse": [{
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/api-logger.py"
+    }],
+    "PostToolUse": [{
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/api-logger.py"
     }]
   },
-  "mcp": {
-    "mcpServers": {
-      "conversation-logger": {
-        "command": "node",
-        "args": ["/ruta/absoluta/claude-conversation-logger/src/mcp-server.js"],
-        "env": {
-          "API_URL": "http://localhost:3003",
-          "API_KEY": "claude_api_secret_2024_change_me"
-        }
+  "mcpServers": {
+    "conversation-logger": {
+      "command": "node",
+      "args": ["/absolute/path/to/claude-conversation-logger/src/mcp-server.js"],
+      "env": {
+        "NODE_ENV": "production"
       }
     }
   }

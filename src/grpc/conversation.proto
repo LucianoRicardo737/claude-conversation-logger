@@ -21,6 +21,15 @@ service ConversationService {
   
   // Obtener estadísticas en tiempo real
   rpc GetLiveStats(Empty) returns (stream StatsEvent);
+  
+  // Stream de sesiones activas en tiempo real
+  rpc StreamActiveSessions(Empty) returns (stream ActiveSessionUpdate);
+  
+  // Suscripción a actualizaciones de conversaciones específicas
+  rpc SubscribeToUpdates(SubscribeRequest) returns (stream ConversationUpdate);
+  
+  // Broadcast de métricas del sistema en tiempo real
+  rpc BroadcastMetrics(Empty) returns (stream MetricsUpdate);
 }
 
 // Mensajes base
@@ -180,4 +189,88 @@ message RecentActivity {
   repeated Message last_messages = 1; // Últimos 10 mensajes
   int32 messages_last_hour = 2;
   int32 active_sessions = 3;
+}
+
+// Nuevos mensajes para streaming de sesiones activas
+message ActiveSessionUpdate {
+  string type = 1; // "session_started", "session_updated", "session_ended"
+  ActiveSession session = 2;
+  int64 timestamp = 3;
+}
+
+message ActiveSession {
+  string session_id = 1;
+  string short_id = 2;
+  string project_name = 3;
+  int64 start_time = 4;
+  int64 last_activity = 5;
+  int32 message_count = 6;
+  int32 duration_seconds = 7; // Duración actual en segundos
+  bool is_marked = 8;
+  string current_status = 9; // "active", "idle", "ending"
+  repeated string active_tools = 10; // Herramientas siendo usadas
+  Message last_message = 11; // Último mensaje para preview
+}
+
+// Suscripción a actualizaciones específicas
+message SubscribeRequest {
+  string type = 1; // "conversations", "search", "sessions"
+  string project_filter = 2; // Filtro opcional por proyecto
+  repeated string session_ids = 3; // Sesiones específicas a seguir
+  map<string, string> filters = 4; // Filtros adicionales
+}
+
+message ConversationUpdate {
+  string type = 1; // "new_message", "session_marked", "session_updated"
+  string session_id = 2;
+  string project_name = 3;
+  Message message = 4; // Opcional: mensaje nuevo
+  SessionMetadata session_metadata = 5; // Metadata actualizada
+  int64 timestamp = 6;
+}
+
+message SessionMetadata {
+  bool is_marked = 1;
+  string note = 2;
+  repeated string tags = 3;
+  string description = 4;
+  string category = 5;
+}
+
+// Métricas del sistema en tiempo real
+message MetricsUpdate {
+  string type = 1; // "system", "performance", "database", "cache"
+  SystemMetrics system = 2;
+  PerformanceMetrics performance = 3;
+  DatabaseMetrics database = 4;
+  CacheMetrics cache = 5;
+  int64 timestamp = 6;
+}
+
+message SystemMetrics {
+  double cpu_usage = 1; // Porcentaje de CPU
+  double memory_usage = 2; // Porcentaje de memoria
+  int32 active_connections = 3;
+  int64 uptime_seconds = 4;
+}
+
+message PerformanceMetrics {
+  double avg_response_time = 1; // Tiempo promedio de respuesta en ms
+  double requests_per_second = 2;
+  double error_rate = 3; // Porcentaje de errores
+  double cache_hit_rate = 4; // Porcentaje de aciertos en caché
+}
+
+message DatabaseMetrics {
+  int64 total_documents = 1;
+  int64 documents_per_second = 2;
+  double avg_query_time = 3; // Tiempo promedio de query en ms
+  int32 active_connections = 4;
+}
+
+message CacheMetrics {
+  int64 total_keys = 1;
+  double hit_rate = 2; // Porcentaje de aciertos
+  int64 memory_usage_bytes = 3;
+  double ops_per_second = 4;
 }
