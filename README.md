@@ -529,50 +529,194 @@ AGENT_ENABLE_AUTO_DOCUMENTATION=true
 ## 🎯 **CASOS DE USO PRÁCTICOS**
 
 ### **🔍 Scenario 1: Debugging Recurrente**
-```bash
-# Problema: "Los pagos fallan esporádicamente"
-# En Claude Code:
+```javascript
+// Problema: "Los pagos fallan esporádicamente"
+// En Claude Code, usar la herramienta MCP:
 search_conversations({
   query: "payment failed timeout integration",
   days: 90,
   includePatterns: true
 })
 
-# El sistema devuelve:
-# - 8 conversaciones similares
-# - Patrón identificado: "Gateway timeout after 30s"
-# - Solución probada: "Increase timeout to 60s + add retry"
+// El SemanticAnalyzer + PatternDiscoveryAgent devuelven:
+// - 8 conversaciones similares encontradas
+// - Patrón identificado: "Gateway timeout after 30s" (frecuencia: 23 veces)
+// - Solución probada: "Increase timeout to 60s + add retry" (éxito: 94%)
+// - Conversaciones relacionadas: sess_456, sess_789, sess_012
 ```
 
 ### **📝 Scenario 2: Documentación Automática**
-```bash
-# Después de resolver un bug complejo
-auto_document_session({
+```javascript
+// Después de resolver un bug complejo
+// El AutoDocumentationAgent genera documentación contextual:
+export_conversation({
   session_id: "debugging_session_456",
-  includeCodeExamples: true
+  format: "markdown",
+  includeCodeExamples: true,
+  autoDetectPatterns: true
 })
 
-# El sistema genera:
-# - Documento markdown estructurado
-# - Problema + pasos de investigación + solución
-# - Código relevante + configuraciones
-# - Tags automáticos para búsqueda futura
+// El sistema genera automáticamente:
+/* 
+# Solución: Payment Gateway Timeout Issues
+
+## Problema Identificado
+- Gateway timeout después de 30 segundos
+- Afecta pagos durante peak hours
+- Error: "ETIMEDOUT" en logs
+
+## Investigación Realizada
+1. Análisis de logs de Nginx
+2. Revisión de configuración de timeout
+3. Monitoreo de latencia de red
+
+## Solución Implementada
+```javascript
+const paymentConfig = {
+  timeout: 60000, // Increased from 30s to 60s
+  retries: 3,     // Added retry logic
+  backoff: 'exponential'
+};
 ```
 
-### **📊 Scenario 3: Analysis de Proyecto**
-```bash
-# Analizar salud del proyecto
+## Verificación
+- ✅ Tests passed: payment-integration.test.js
+- ✅ Timeout reducido de 23 errores/día a 0
+- ✅ Success rate: 99.2%
+
+## Tags
+#payment #timeout #gateway #production-fix
+*/
+```
+
+### **📊 Scenario 3: Análisis de Proyecto**
+```javascript
+// Analizar salud del proyecto con PatternDiscoveryAgent
 analyze_conversation_patterns({
   project: "e-commerce-api",
   days: 30,
-  minFrequency: 3
+  minFrequency: 3,
+  includeSuccessRates: true
 })
 
-# El sistema identifica:
-# - Top 5 problemas recurrentes
-# - Efectividad de soluciones (% success rate)
-# - Recomendaciones para prevenir issues
+// El sistema identifica automáticamente:
+{
+  "top_issues": [
+    {
+      "pattern": "Database connection timeouts",
+      "frequency": 18,
+      "success_rate": 0.89,
+      "avg_resolution_time": "2.3 hours",
+      "recommended_action": "Implement connection pooling"
+    },
+    {
+      "pattern": "Redis cache misses",
+      "frequency": 12,
+      "success_rate": 0.92,
+      "avg_resolution_time": "45 minutes",
+      "recommended_action": "Review cache invalidation strategy"
+    }
+  ],
+  "trending_topics": ["authentication", "api-rate-limiting", "database-performance"],
+  "recommendation": "Focus on database optimization - 60% of issues stem from DB layer"
+}
 ```
+
+### **🔗 Scenario 4: Búsqueda Inteligente de Contexto**
+```javascript
+// Trabajando en un problema nuevo, buscar contexto similar
+// El RelationshipMapper encuentra conexiones inteligentes:
+search_conversations({
+  query: "React component not rendering after state update",
+  days: 60,
+  includeRelationships: true,
+  minConfidence: 0.7
+})
+
+// Resultado con análisis relacional:
+{
+  "direct_matches": [
+    {
+      "session_id": "sess_789",
+      "similarity": 0.94,
+      "relationship_type": "identical_problem",
+      "solution_confidence": 0.96,
+      "quick_solution": "Add useEffect dependency array"
+    }
+  ],
+  "related_conversations": [
+    {
+      "session_id": "sess_234",
+      "similarity": 0.78,
+      "relationship_type": "similar_context",
+      "topic_overlap": ["React", "state management", "useEffect"]
+    }
+  ],
+  "patterns_detected": {
+    "common_cause": "Missing useEffect dependencies",
+    "frequency": 15,
+    "success_rate": 0.93
+  }
+}
+```
+
+### **🧠 Scenario 5: Análisis Multi-Agente Completo**
+```javascript
+// Para conversaciones complejas, activar todos los agentes:
+analyze_conversation_intelligence({
+  session_id: "complex_debugging_session",
+  includeSemanticAnalysis: true,
+  includeRelationships: true,
+  generateInsights: true,
+  maxTokenBudget: 200
+})
+
+// El ConversationOrchestrator coordina todos los agentes:
+{
+  "semantic_analysis": {
+    "topics": ["microservices", "docker", "kubernetes", "monitoring"],
+    "entities": ["Prometheus", "Grafana", "Helm charts"],
+    "complexity": "advanced",
+    "resolution_confidence": 0.91
+  },
+  "session_state": {
+    "status": "completed",
+    "quality_score": 0.87,
+    "documentation_ready": true
+  },
+  "relationships": [
+    {
+      "session_id": "sess_345",
+      "similarity": 0.82,
+      "type": "follow_up"
+    }
+  ],
+  "patterns": {
+    "recurring_issue": "Kubernetes resource limits",
+    "frequency": 8,
+    "trend": "increasing"
+  },
+  "insights": [
+    {
+      "type": "recommendation",
+      "priority": "high", 
+      "description": "Consider implementing HPA for dynamic scaling",
+      "confidence": 0.85
+    }
+  ]
+}
+```
+
+### **📖 Documentación Completa de Agentes**
+
+Para uso avanzado y configuración detallada, consultar la documentación técnica completa:
+
+- **[📚 Guía General de Agentes](./src/agents/docs/README.md)** - Arquitectura completa y características técnicas
+- **[🚀 Guía de Uso Práctico](./src/agents/docs/USAGE_GUIDE.md)** - Ejemplos detallados y mejores prácticas  
+- **[🔌 Integración MCP](./src/agents/docs/MCP_INTEGRATION.md)** - Setup completo con Claude Code
+- **[⚡ Referencia Rápida](./src/agents/docs/QUICK_REFERENCE.md)** - Comandos y troubleshooting
+- **[⚙️ Configuración Avanzada](./src/agents/docs/CONFIGURATION.md)** - 42 parámetros configurables
+- **[💾 Integración con Base de Datos](./src/agents/docs/DATABASE_INTEGRATION.md)** - Esquemas y colecciones
 
 ---
 
@@ -710,31 +854,12 @@ curl -X POST http://localhost:3003/api/conversations \
 
 ---
 
-## 🚀 **ROADMAP FUTURO**
-
-### **🔄 Mejoras de Agentes Planificadas**
-- **🤖 Collaborative Agents**: Multi-agent collaboration patterns
-- **🧠 Learning Agents**: Self-improvement from user feedback  
-- **🌍 Extended Languages**: Support for more languages and cultures
-- **📊 Predictive Analytics**: Trend prediction and proactive insights
-- **🔗 API Integration**: Connect with external tools and services
-
-### **🔌 Integraciones**
-- **Slack Integration**: Team collaboration features
-- **GitHub Integration**: Code change correlation
-- **Grafana Dashboards**: Advanced monitoring
-- **Webhook Support**: External system integrations
-- **Email Notifications**: Automated insights delivery
-
----
-
 ## 📞 **SOPORTE Y CONTRIBUCIÓN**
 
 ### **🆘 Obtener Ayuda**
 - 📖 **Documentación Técnica**: Ver `/src/agents/docs/`
 - 🐛 **Reportar Bugs**: GitHub Issues
-- 💡 **Solicitar Features**: GitHub Discussions  
-- 📧 **Soporte Directo**: luciano.ricardo737@gmail.com
+- 💡 **Solicitar Features**: GitHub Discussions
 
 ### **🤝 Contribuir**
 ```bash
