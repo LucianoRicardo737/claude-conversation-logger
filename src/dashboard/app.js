@@ -1309,14 +1309,8 @@ const OptimizedDashboard = {
                     <!-- Sessions Analytics Dashboard -->
                     <div v-else-if="store.activeView === 'sessions'" class="h-full flex flex-col">
                         <!-- Header -->
-                        <div class="flex-shrink-0 mb-6">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h1 class="text-3xl font-bold text-white">Análisis de Sesiones</h1>
-                                    <p class="text-gray-300 mt-1">
-                                        Vista completa de actividad y estadísticas
-                                    </p>
-                                </div>
+                        <div class="flex-shrink-0 mb-4">
+                            <div class="flex items-center justify-end">
                                 <button @click="setActiveView('dashboard')" 
                                         class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
                                     <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
@@ -1325,9 +1319,9 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Statistics Cards -->
-                        <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                             <!-- Total Sessions -->
-                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-layer-group text-2xl text-blue-400"></i>
@@ -1340,7 +1334,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Active Sessions -->
-                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-play-circle text-2xl text-green-400"></i>
@@ -1353,7 +1347,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Average Messages -->
-                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-chart-line text-2xl text-purple-400"></i>
@@ -1366,7 +1360,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Activity Rate -->
-                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-tachometer-alt text-2xl text-yellow-400"></i>
@@ -1380,16 +1374,16 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Analytics Grid -->
-                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden min-h-0">
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden min-h-0">
                             <!-- Sessions by Project -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
-                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-folder text-blue-400 mr-3"></i>
                                         Sesiones por Proyecto
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-6 overflow-y-auto">
+                                <div class="flex-1 p-4 overflow-y-auto">
                                     <div class="space-y-4">
                                         <div v-for="project in sessionsAnalytics.sessionsByProject" :key="project.name"
                                              class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
@@ -1408,13 +1402,13 @@ const OptimizedDashboard = {
 
                             <!-- Longest Sessions -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
-                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-trophy text-yellow-400 mr-3"></i>
                                         Sesiones Más Largas
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-6 overflow-y-auto">
+                                <div class="flex-1 p-4 overflow-y-auto">
                                     <div class="space-y-3">
                                         <div v-for="(session, index) in sessionsAnalytics.longestSessions" :key="session.session_id"
                                              @click="selectProject(store.conversations.find(p => p.name === session.projectName))"
@@ -1440,13 +1434,13 @@ const OptimizedDashboard = {
 
                             <!-- Real-time Status -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
-                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-pulse text-green-400 mr-3"></i>
                                         Estado en Tiempo Real
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-6 overflow-y-auto">
+                                <div class="flex-1 p-4 overflow-y-auto">
                                     <div class="space-y-4">
                                         <div class="flex items-center justify-between">
                                             <span class="text-gray-400">Sesiones activas</span>
@@ -1469,13 +1463,13 @@ const OptimizedDashboard = {
 
                             <!-- Average Duration -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
-                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-clock text-blue-400 mr-3"></i>
                                         Duración Promedio
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-6 overflow-y-auto">
+                                <div class="flex-1 p-4 overflow-y-auto">
                                     <div class="space-y-4">
                                         <div class="text-center">
                                             <p class="text-3xl font-bold text-white mb-2">{{ sessionsAnalytics.averageMessages || 0 }}</p>
