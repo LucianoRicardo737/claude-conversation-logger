@@ -931,9 +931,9 @@ const OptimizedDashboard = {
                 <main class="flex-1 overflow-y-auto">
                     <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 h-full">
                     <!-- Dashboard View -->
-                    <div v-if="store.activeView === 'dashboard' && !store.isLoading" class="h-full flex flex-col space-y-8">
+                    <div v-if="store.activeView === 'dashboard' && !store.isLoading" class="h-full flex flex-col">
                         <!-- Stats Grid -->
-                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0 mb-4">
                             <!-- Total Messages -->
                             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
                                 <div class="p-6">
@@ -1024,10 +1024,10 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Main Dashboard Content Grid -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 overflow-hidden">
                             <!-- Proyectos Más Activos -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col">
-                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-96">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
                                             <div class="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mr-3">
@@ -1041,7 +1041,7 @@ const OptimizedDashboard = {
                                     </div>
                                 </div>
                                 
-                                <div class="p-6 flex-1 overflow-y-auto">
+                                <div class="p-4 flex-1 overflow-y-auto">
                                     <div v-if="filteredProjects.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
                                         <i class="fas fa-folder-open text-3xl text-gray-300 mb-3"></i>
                                         <p>No hay proyectos disponibles</p>
@@ -1095,8 +1095,8 @@ const OptimizedDashboard = {
                             </div>
                             
                             <!-- Sesiones Activas - Temporalmente simplificado -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col">
-                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-96">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
                                             <div class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mr-3">
@@ -1110,7 +1110,7 @@ const OptimizedDashboard = {
                                     </div>
                                 </div>
                                 
-                                <div class="p-6 flex-1 overflow-y-auto">
+                                <div class="p-4 flex-1 overflow-y-auto">
                                     <div class="space-y-4">
                                         <!-- Active Session Example -->
                                         <div class="p-4 rounded-lg border border-green-100 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
