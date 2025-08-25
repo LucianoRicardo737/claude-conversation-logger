@@ -1159,15 +1159,6 @@ const OptimizedDashboard = {
 
                     <!-- Projects View -->
                     <div v-else-if="store.activeView === 'projects'" class="h-full flex flex-col">
-                        <!-- Header with breadcrumb -->
-                        <div class="flex-shrink-0 mb-6">
-                            <div class="flex items-center space-x-2 text-sm mb-4">
-                                <i class="fas fa-chart-line text-blue-500"></i>
-                                <span class="text-blue-500 cursor-pointer" @click="setActiveView('dashboard')">Dashboard</span>
-                                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-                                <span class="text-gray-300">Proyectos</span>
-                            </div>
-                        </div>
 
                         <!-- Search and Filters Bar -->
                         <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
@@ -1235,10 +1226,10 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Projects List Header -->
-                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-t-lg px-6 py-4 border-b border-gray-600">
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-t-lg px-4 py-3 border-b border-gray-600">
                             <div class="flex items-center">
-                                <i class="fas fa-folder text-blue-500 mr-3"></i>
-                                <h2 class="text-lg font-semibold text-white">Todos los Proyectos</h2>
+                                <i class="fas fa-folder text-blue-500 mr-2"></i>
+                                <h2 class="text-base font-semibold text-white">Todos los Proyectos</h2>
                                 <span class="ml-auto text-gray-400 text-sm">{{ filteredProjects.length }} proyectos</span>
                             </div>
                         </div>
@@ -1250,7 +1241,7 @@ const OptimizedDashboard = {
                                     v-for="project in filteredProjects" 
                                     :key="project.name"
                                     @click="selectProject(project)"
-                                    class="px-6 py-4 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
+                                    class="px-4 py-3 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
                                 >
                                     <div class="flex items-center justify-between">
                                         <!-- Left side: Project info -->
