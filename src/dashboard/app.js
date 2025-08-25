@@ -9,8 +9,9 @@ const { createApp, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
 // import { SearchFilters } from './components/SearchFilters.js';
 // import { BreadcrumbNavigation } from './components/BreadcrumbNavigation.js';
 
-// Import API service (REST with polling for browser compatibility)
+// Import services - prioritize gRPC for real-time data
 import apiService from './services/api-service.js';
+import grpcClient from './services/grpc-client.js';
 
 // Global configuration
 const API_BASE_URL = window.location.origin;
@@ -351,10 +352,10 @@ const OptimizedDashboard = {
 
         // === Costs Computed Properties ===
         costMetrics() {
-            const totalCost = this.store.liveStats.total_cost || 2.73;
-            const totalMessages = this.store.liveStats.total_messages || 1366;
-            const totalSessions = this.store.liveStats.total_sessions || 9;
-            const totalTokens = this.store.liveStats.total_tokens || 204500;
+            const totalCost = this.store.liveStats.total_cost || 0;
+            const totalMessages = this.store.liveStats.total_messages || 0;
+            const totalSessions = this.store.liveStats.total_sessions || 0;
+            const totalTokens = this.store.liveStats.total_tokens || 0;
             
             const periodDays = parseInt(this.store.costs.dateRange) || 30;
             const periodCost = totalCost * 0.8; // Simulate period cost (80% of total)
@@ -444,33 +445,11 @@ const OptimizedDashboard = {
             // Setup keyboard shortcuts
             this.setupKeyboardShortcuts();
             
-            // Setup connection status listener
-            apiService.on('connection', (data) => {
-                this.store.connectionStatus = data.status;
-                console.log(`📡 API service connection status: ${data.status}`);
-            });
+            // Setup gRPC real-time listeners for LIVE data
+            this.setupGrpcListeners();
             
-            // Setup real-time message listener
-            apiService.on('new_message', (message) => {
-                console.log('📨 New message received via API service:', message);
-                this.handleNewMessage(message);
-            });
-            
-            // Setup live stats listener  
-            apiService.on('live_stats', (stats) => {
-                this.updateLiveStats(stats);
-            });
-            
-            // Setup session updates listener
-            apiService.on('session_start', (message) => {
-                console.log('🚀 New session started via API service:');
-                this.handleSessionStart(message);
-            });
-            
-            apiService.on('session_end', (message) => {
-                console.log('🔚 Session ended via API service');
-                this.handleSessionEnd(message);
-            });
+            // Fallback to API service if gRPC fails
+            this.setupApiServiceListeners();
             
             // Setup performance monitoring
             this.startPerformanceMonitoring();
@@ -618,36 +597,71 @@ const OptimizedDashboard = {
         // === Data Loading ===
         async initializeData() {
             await this.handleAsyncOperation(async () => {
-                console.log('📊 Loading initial dashboard data...');
+                console.log('📊 Loading initial dashboard data with gRPC priority...');
                 
-                // Connect to API service
-                const connected = await apiService.connect();
-                if (!connected) {
-                    throw new Error('Failed to connect to API service');
+                let dataLoaded = false;
+                
+                // Try gRPC first for REAL-TIME data
+                try {
+                    console.log('🚀 Attempting gRPC connection for REAL data...');
+                    const grpcConnected = await grpcClient.connect();
+                    
+                    if (grpcConnected) {
+                        console.log('✅ gRPC connected! Loading REAL data...');
+                        
+                        // Load conversation tree with REAL data
+                        const realConversationTree = await grpcClient.getConversationTree();
+                        console.log('📋 REAL conversation tree loaded via gRPC:', realConversationTree);
+                        
+                        if (realConversationTree && realConversationTree.projects) {
+                            this.store.conversations = realConversationTree.projects.map(project => ({
+                                name: project.name,
+                                sessions: project.sessions || [],
+                                message_count: project.message_count || 0,
+                                last_activity: project.last_activity
+                            }));
+                        }
+                        
+                        console.log(`✅ REAL data loaded via gRPC: ${this.store.conversations.length} projects`);
+                        dataLoaded = true;
+                        
+                        // gRPC streams will handle live updates automatically
+                    }
+                } catch (error) {
+                    console.warn('⚠️ gRPC connection failed, falling back to REST API:', error.message);
                 }
                 
-                // Load conversation tree
-                const conversationTree = await apiService.getConversationTree();
-                console.log('📋 Conversation tree loaded:', conversationTree);
-                
-                if (conversationTree && conversationTree.projects) {
-                    this.store.conversations = conversationTree.projects.map(project => ({
-                        name: project.project_name,
-                        sessions: project.sessions || [],
-                        message_count: project.total_messages || 0,
-                        last_activity: project.last_activity
-                    }));
+                // Fallback to REST API if gRPC failed
+                if (!dataLoaded) {
+                    console.log('📡 Using REST API fallback...');
+                    const connected = await apiService.connect();
+                    if (!connected) {
+                        throw new Error('Failed to connect to both gRPC and REST API services');
+                    }
+                    
+                    // Load conversation tree via REST
+                    const conversationTree = await apiService.getConversationTree();
+                    console.log('📋 Conversation tree loaded via REST fallback:', conversationTree);
+                    
+                    if (conversationTree && conversationTree.projects) {
+                        this.store.conversations = conversationTree.projects.map(project => ({
+                            name: project.project_name,
+                            sessions: project.sessions || [],
+                            message_count: project.total_messages || 0,
+                            last_activity: project.last_activity
+                        }));
+                    }
+                    
+                    // Load initial stats via REST
+                    const stats = await apiService.getStats();
+                    this.updateLiveStats(stats);
                 }
-                
-                // Load initial stats
-                const stats = await apiService.getStats();
-                this.updateLiveStats(stats);
                 
                 this.lastUpdate = new Date();
                 console.log('✅ Dashboard data loaded successfully');
                 
             }, {
-                loadingMessage: 'Loading dashboard...',
+                loadingMessage: 'Loading dashboard with real-time data...',
                 showLoading: true
             });
         },
@@ -863,7 +877,7 @@ const OptimizedDashboard = {
                 totalMessages: this.totalMessagesCount,
                 activeSessions: this.store.liveStats.active_sessions || 0,
                 totalTokens: this.store.liveStats.total_tokens || 0,
-                estimatedCost: this.store.liveStats.estimated_cost || 2.73
+                estimatedCost: this.store.liveStats.estimated_cost || 0
             };
         },
 
@@ -986,6 +1000,151 @@ const OptimizedDashboard = {
             this.store.analytics.customStartDate = '';
             this.store.analytics.customEndDate = '';
             this.updateAnalytics();
+        },
+
+        // === gRPC Real-time Integration ===
+        
+        setupGrpcListeners() {
+            console.log('🚀 Setting up gRPC real-time listeners for LIVE data');
+            
+            // Connection status listener
+            grpcClient.on('connection', (data) => {
+                // Defensive handling for undefined data or status
+                const status = data?.status || 'unknown';
+                this.store.connectionStatus = status;
+                console.log(`📡 gRPC connection status: ${status} (Client: ${data?.clientId || 'unknown'})`);
+                
+                if (status === 'connected') {
+                    // Start gRPC streams for real-time data
+                    this.startGrpcStreams();
+                }
+            });
+            
+            // Live stats listener - REAL DATA
+            grpcClient.on('live_stats', (stats) => {
+                console.log('📊 Received REAL live stats via gRPC:', stats);
+                this.updateLiveStats(stats);
+            });
+            
+            // Active sessions listener - REAL DATA
+            grpcClient.on('active_sessions_update', (sessionData) => {
+                console.log('👥 Received REAL active sessions via gRPC:', sessionData);
+                this.handleActiveSessionsUpdate(sessionData);
+            });
+            
+            // Conversations updates listener - REAL DATA  
+            grpcClient.on('conversations_update', (conversations) => {
+                console.log('💬 Received REAL conversations update via gRPC:', conversations);
+                this.handleConversationsUpdate(conversations);
+            });
+            
+            // New message listener
+            grpcClient.on('new_message', (message) => {
+                console.log('📨 New message received via gRPC:', message);
+                this.handleNewMessage(message);
+            });
+        },
+        
+        setupApiServiceListeners() {
+            console.log('📡 Setting up API service fallback listeners');
+            
+            // Connection status listener
+            apiService.on('connection', (data) => {
+                if (grpcClient.getConnectionStatus() !== 'connected') {
+                    this.store.connectionStatus = data.status;
+                    console.log(`📡 API service connection status: ${data.status}`);
+                }
+            });
+            
+            // Live stats listener (fallback)
+            apiService.on('live_stats', (stats) => {
+                if (grpcClient.getConnectionStatus() !== 'connected') {
+                    console.log('📊 Received stats via API service fallback:', stats);
+                    this.updateLiveStats(stats);
+                }
+            });
+            
+            // Session updates listener (fallback)
+            apiService.on('session_start', (message) => {
+                if (grpcClient.getConnectionStatus() !== 'connected') {
+                    console.log('🚀 New session started via API service fallback');
+                    this.handleSessionStart(message);
+                }
+            });
+        },
+        
+        startGrpcStreams() {
+            console.log('🌊 Starting gRPC streams for real-time data');
+            
+            try {
+                // Start live stats streaming
+                grpcClient.streamLiveStats();
+                
+                // Start active sessions streaming  
+                grpcClient.streamActiveSessions();
+                
+                // Start conversations streaming
+                grpcClient.streamConversations();
+                
+                console.log('✅ All gRPC streams started successfully');
+            } catch (error) {
+                console.error('❌ Error starting gRPC streams:', error);
+            }
+        },
+        
+        handleActiveSessionsUpdate(sessionData) {
+            // Update sessions data in store with REAL data
+            if (sessionData && sessionData.session) {
+                console.log(`👥 Processing REAL session update: ${sessionData.type} for session ${sessionData.session.short_id}`);
+                
+                // Update session count in liveStats instead of stats
+                if (this.store.liveStats && this.store.liveStats.recent_activity) {
+                    this.store.liveStats.recent_activity.active_sessions = sessionData.session.message_count || 0;
+                }
+                
+                // Update conversations if needed
+                this.updateConversationsWithSession(sessionData.session);
+            }
+        },
+        
+        handleConversationsUpdate(conversations) {
+            // Update conversations with REAL data
+            if (conversations && conversations.projects) {
+                console.log(`💬 Processing REAL conversations update: ${conversations.projects.length} projects`);
+                this.store.conversations = conversations.projects;
+                
+                // Update liveStats instead of stats (which doesn't exist)
+                if (this.store.liveStats) {
+                    this.store.liveStats.active_projects = conversations.total_projects || 0;
+                    this.store.liveStats.total_sessions = conversations.total_sessions || 0;
+                    this.store.liveStats.total_messages = conversations.total_messages || 0;
+                }
+            }
+        },
+        
+        updateConversationsWithSession(session) {
+            // Find and update session in conversations array
+            const projectIndex = this.store.conversations.findIndex(p => p.name === session.project_name);
+            if (projectIndex !== -1) {
+                const sessionIndex = this.store.conversations[projectIndex].sessions?.findIndex(s => s.session_id === session.session_id);
+                if (sessionIndex !== -1) {
+                    // Update existing session
+                    this.store.conversations[projectIndex].sessions[sessionIndex] = {
+                        ...this.store.conversations[projectIndex].sessions[sessionIndex],
+                        ...session,
+                        is_active: session.current_status === 'active'
+                    };
+                } else {
+                    // Add new session to project
+                    if (!this.store.conversations[projectIndex].sessions) {
+                        this.store.conversations[projectIndex].sessions = [];
+                    }
+                    this.store.conversations[projectIndex].sessions.unshift({
+                        ...session,
+                        is_active: session.current_status === 'active'
+                    });
+                }
+            }
         }
     },
 
@@ -1192,7 +1351,7 @@ const OptimizedDashboard = {
                                             <dl>
                                                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Estimado</dt>
                                                 <dd class="text-3xl font-bold text-gray-900 dark:text-white stat-number">
-                                                    $ {{ formatCost(store.liveStats.estimated_cost || 2.73) }}
+                                                    $ {{ formatCost(store.liveStats.estimated_cost || 0) }}
                                                 </dd>
                                                 <dd class="text-xs text-gray-400 mt-1">Claude API</dd>
                                             </dl>
@@ -1284,7 +1443,7 @@ const OptimizedDashboard = {
                                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Sesiones Activas</h3>
                                         </div>
                                         <div class="text-sm text-green-500 font-medium">
-                                            {{ store.liveStats.active_sessions || 1 }} En vivo
+                                            {{ store.liveStats.active_sessions || 0 }} En vivo
                                         </div>
                                     </div>
                                 </div>
@@ -1306,7 +1465,7 @@ const OptimizedDashboard = {
                                                     </div>
                                                     
                                                     <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                                        claude-conversation-logger • {{ formatMetric(store.liveStats.total_messages || 1166) }} mensajes
+                                                        claude-conversation-logger • {{ formatMetric(store.liveStats.total_messages || 0) }} mensajes
                                                     </div>
                                                     
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -1317,7 +1476,7 @@ const OptimizedDashboard = {
                                                 
                                                 <div class="flex flex-col items-end">
                                                     <div class="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                                                        174.5K • $ {{ formatCost(store.liveStats.estimated_cost || 2.73) }}
+                                                        {{ formatMetric(store.liveStats.total_tokens || 0) }} • $ {{ formatCost(store.liveStats.estimated_cost || 0) }}
                                                     </div>
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                                         Claude API
@@ -1920,15 +2079,15 @@ const OptimizedDashboard = {
                                             <div class="space-y-2">
                                                 <div class="flex items-center justify-between text-xs">
                                                     <span class="text-gray-400">Últimas 24h</span>
-                                                    <span class="text-green-400 font-medium">{{ formatMetric(store.liveStats.messages_last_24h || 89) }} mensajes</span>
+                                                    <span class="text-green-400 font-medium">{{ formatMetric(store.liveStats.messages_last_24h || 0) }} mensajes</span>
                                                 </div>
                                                 <div class="flex items-center justify-between text-xs">
                                                     <span class="text-gray-400">Promedio diario</span>
-                                                    <span class="text-blue-400 font-medium">{{ Math.round((store.liveStats.total_messages || 1366) / 30) }} mensajes</span>
+                                                    <span class="text-blue-400 font-medium">{{ Math.round((store.liveStats.total_messages || 0) / 30) }} mensajes</span>
                                                 </div>
                                                 <div class="flex items-center justify-between text-xs">
                                                     <span class="text-gray-400">Sesiones activas</span>
-                                                    <span class="text-yellow-400 font-medium">{{ store.liveStats.active_sessions || 1 }}</span>
+                                                    <span class="text-yellow-400 font-medium">{{ store.liveStats.active_sessions || 0 }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1946,11 +2105,11 @@ const OptimizedDashboard = {
                                         <!-- Key Metrics Grid -->
                                         <div class="grid grid-cols-2 gap-3">
                                             <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded text-center">
-                                                <div class="text-2xl font-bold text-blue-400">{{ formatMetric(store.liveStats.total_messages || 1366) }}</div>
+                                                <div class="text-2xl font-bold text-blue-400">{{ formatMetric(store.liveStats.total_messages || 0) }}</div>
                                                 <div class="text-xs text-gray-400">Total Mensajes</div>
                                             </div>
                                             <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded text-center">
-                                                <div class="text-2xl font-bold text-green-400">{{ store.liveStats.total_sessions || 9 }}</div>
+                                                <div class="text-2xl font-bold text-green-400">{{ store.liveStats.total_sessions || 0 }}</div>
                                                 <div class="text-xs text-gray-400">Sesiones</div>
                                             </div>
                                         </div>
@@ -1963,7 +2122,7 @@ const OptimizedDashboard = {
                                                     <span class="text-xs text-gray-400">Mensajes por Sesión</span>
                                                     <div class="flex items-center">
                                                         <span class="text-sm text-white font-medium mr-2">
-                                                            {{ Math.round((store.liveStats.total_messages || 1366) / (store.liveStats.total_sessions || 9)) }}
+                                                            {{ Math.round((store.liveStats.total_messages || 0) / Math.max(store.liveStats.total_sessions || 1, 1)) }}
                                                         </span>
                                                         <div class="w-16 bg-gray-600 rounded-full h-1">
                                                             <div class="bg-blue-400 h-1 rounded-full" style="width: 75%"></div>
@@ -1974,7 +2133,7 @@ const OptimizedDashboard = {
                                                 <div class="flex items-center justify-between">
                                                     <span class="text-xs text-gray-400">Tokens Procesados</span>
                                                     <div class="flex items-center">
-                                                        <span class="text-sm text-white font-medium mr-2">{{ formatMetric(store.liveStats.total_tokens || 204500) }}</span>
+                                                        <span class="text-sm text-white font-medium mr-2">{{ formatMetric(store.liveStats.total_tokens || 0) }}</span>
                                                         <div class="w-16 bg-gray-600 rounded-full h-1">
                                                             <div class="bg-green-400 h-1 rounded-full" style="width: 90%"></div>
                                                         </div>
@@ -1985,7 +2144,7 @@ const OptimizedDashboard = {
                                                     <span class="text-xs text-gray-400">Costo por Token</span>
                                                     <div class="flex items-center">
                                                         <span class="text-sm text-white font-medium mr-2">
-                                                            {{ ((store.liveStats.total_cost || 2.73) / (store.liveStats.total_tokens || 204500) * 1000000).toFixed(2) }}
+                                                            {{ store.liveStats.total_cost && store.liveStats.total_tokens ? ((store.liveStats.total_cost / store.liveStats.total_tokens) * 1000000).toFixed(2) : '0.00' }}
                                                         </span>
                                                         <div class="w-16 bg-gray-600 rounded-full h-1">
                                                             <div class="bg-yellow-400 h-1 rounded-full" style="width: 60%"></div>
