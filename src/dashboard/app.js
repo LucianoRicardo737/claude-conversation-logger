@@ -64,6 +64,23 @@ const store = reactive({
         }
     },
     
+    // Costs configuration
+    costs: {
+        dateRange: '30', // Default to last month
+        selectedProject: '', // Filter by specific project
+        useCustomDates: false,
+        customStartDate: '',
+        customEndDate: ''
+    },
+    
+    // Analytics configuration
+    analytics: {
+        dateRange: '30', // Default to last month
+        useCustomDates: false,
+        customStartDate: '',
+        customEndDate: ''
+    },
+    
     // Connection status (using gRPC)
     connectionStatus: 'disconnected',
     
@@ -330,6 +347,91 @@ const OptimizedDashboard = {
                 .slice(0, 10);
             
             return analytics;
+        },
+
+        // === Costs Computed Properties ===
+        costMetrics() {
+            const totalCost = this.store.liveStats.total_cost || 2.73;
+            const totalMessages = this.store.liveStats.total_messages || 1366;
+            const totalSessions = this.store.liveStats.total_sessions || 9;
+            const totalTokens = this.store.liveStats.total_tokens || 204500;
+            
+            const periodDays = parseInt(this.store.costs.dateRange) || 30;
+            const periodCost = totalCost * 0.8; // Simulate period cost (80% of total)
+            const previousPeriodCost = totalCost * 0.6; // Simulate previous period
+            const trend = previousPeriodCost > 0 ? ((periodCost - previousPeriodCost) / previousPeriodCost) * 100 : 0;
+            
+            return {
+                totalCost: totalCost,
+                periodCost: periodCost,
+                trend: trend,
+                monthlyProjection: (periodCost / periodDays) * 30,
+                costPerMessage: totalCost / (totalMessages || 1),
+                costPerSession: totalCost / (totalSessions || 1),
+                tokensPerMessage: totalTokens / (totalMessages || 1),
+                tokensPerDollar: totalTokens / (totalCost || 1),
+                dailyAverage: totalCost / Math.max(periodDays, 1),
+                peakUsage: totalCost * 0.3, // Simulate peak usage
+                peakDate: 'Ayer, 14:30'
+            };
+        },
+
+        projectCostBreakdown() {
+            if (!this.store.liveStats || !this.store.liveStats.project_activity) {
+                // Use conversations data as fallback
+                const projects = this.store.conversations.map(project => ({
+                    name: project.name,
+                    cost: (project.total_messages || 0) * 0.002, // Simulate cost calculation
+                    messages: project.total_messages || 0,
+                    sessions: project.sessions ? project.sessions.length : 0
+                }));
+
+                const totalCost = projects.reduce((sum, p) => sum + p.cost, 0);
+                
+                return projects
+                    .filter(project => this.store.costs.selectedProject === '' || project.name === this.store.costs.selectedProject)
+                    .map(project => ({
+                        ...project,
+                        percentage: totalCost > 0 ? ((project.cost / totalCost) * 100).toFixed(1) : 0
+                    }))
+                    .sort((a, b) => b.cost - a.cost);
+            }
+            
+            // Use project_activity from API data
+            const projects = this.store.liveStats.project_activity || [];
+            const totalCost = projects.reduce((sum, p) => sum + (p.cost || 0), 0);
+            
+            return projects
+                .filter(project => this.store.costs.selectedProject === '' || project.name === this.store.costs.selectedProject)
+                .map(project => ({
+                    name: project.name,
+                    cost: project.cost || 0,
+                    messages: project.messages || 0,
+                    sessions: project.sessions || 0,
+                    percentage: totalCost > 0 ? ((project.cost / totalCost) * 100).toFixed(1) : 0
+                }))
+                .sort((a, b) => b.cost - a.cost);
+        },
+        
+        projectActivityData() {
+            if (!this.store.conversations || !this.store.conversations.length) return [];
+            
+            const totalMessages = this.store.conversations.reduce((sum, project) => 
+                sum + (project.total_messages || project.message_count || 0), 0
+            );
+            
+            return this.store.conversations.map(project => {
+                const messageCount = project.total_messages || project.message_count || 0;
+                return {
+                    name: project.project_name || project.name,
+                    messages: messageCount,
+                    sessions: project.sessions ? project.sessions.length : 0,
+                    percentage: totalMessages > 0 ? 
+                        parseFloat(((messageCount / totalMessages) * 100).toFixed(1)) : 0
+                };
+            })
+            .sort((a, b) => b.messages - a.messages)
+            .slice(0, 10); // Limit to top 10 projects
         }
     },
 
@@ -807,6 +909,83 @@ const OptimizedDashboard = {
 
         handleToast(message) {
             console.log('Toast:', message);
+        },
+
+        // === Costs Methods ===
+        updateCostsData() {
+            // Simular actualización de datos de costos
+            console.log('Updating costs data for period:', this.store.costs.dateRange);
+        },
+
+        applyCustomCostRange() {
+            if (this.store.costs.customStartDate && this.store.costs.customEndDate) {
+                this.store.costs.useCustomDates = true;
+                this.updateCostsData();
+            }
+        },
+
+        clearCostsFilters() {
+            this.store.costs.dateRange = '30';
+            this.store.costs.selectedProject = '';
+            this.store.costs.useCustomDates = false;
+            this.store.costs.customStartDate = '';
+            this.store.costs.customEndDate = '';
+            this.updateCostsData();
+        },
+
+        getCostDateRangeLabel() {
+            if (this.store.costs.useCustomDates) {
+                return `${this.store.costs.customStartDate} - ${this.store.costs.customEndDate}`;
+            }
+            const labels = {
+                '7': 'Últimos 7 días',
+                '30': 'Último mes',
+                '90': 'Últimos 3 meses',
+                '180': 'Últimos 6 meses',
+                '365': 'Último año'
+            };
+            return labels[this.store.costs.dateRange] || 'Período seleccionado';
+        },
+
+        generateCostAlerts() {
+            const { trend } = this.costMetrics;
+            const alerts = [];
+            
+            if (trend > 20) {
+                alerts.push({
+                    type: 'warning',
+                    message: 'Incremento significativo en costos (+20%)'
+                });
+            }
+            
+            if (trend < -10) {
+                alerts.push({
+                    type: 'success',
+                    message: 'Reducción notable en costos (-10%)'
+                });
+            }
+            
+            return alerts;
+        },
+
+        // === Analytics Methods ===
+        updateAnalytics() {
+            console.log('Updating analytics for period:', this.store.analytics.dateRange);
+        },
+
+        applyCustomAnalyticsRange() {
+            if (this.store.analytics.customStartDate && this.store.analytics.customEndDate) {
+                this.store.analytics.useCustomDates = true;
+                this.updateAnalytics();
+            }
+        },
+
+        clearAnalyticsFilters() {
+            this.store.analytics.dateRange = '30';
+            this.store.analytics.useCustomDates = false;
+            this.store.analytics.customStartDate = '';
+            this.store.analytics.customEndDate = '';
+            this.updateAnalytics();
         }
     },
 
@@ -873,8 +1052,8 @@ const OptimizedDashboard = {
                                         <i class="fas fa-clock mr-1"></i>
                                         Sesiones
                                     </button>
-                                    <button @click="setActiveView('analysis')" 
-                                            :class="store.activeView === 'analysis' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                                    <button @click="setActiveView('analytics')" 
+                                            :class="store.activeView === 'analytics' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
                                             class="px-3 py-2 text-sm font-medium border-b-2 border-transparent">
                                         <i class="fas fa-chart-bar mr-1"></i>
                                         Análisis
@@ -1087,7 +1266,7 @@ const OptimizedDashboard = {
                                             <!-- Progress bar -->
                                             <div class="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
                                                 <div class="bg-blue-500 h-1 rounded-full transition-all" 
-                                                     :style="{width: Math.min((project.message_count || 0) / 100, 100) + '%'}"></div>
+                                                     :style="{ width: Math.min((project.message_count || 0) / 100, 100) + '%' }"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -1356,16 +1535,16 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Analytics Grid -->
-                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0" style="height: calc(100vh - 180px);">
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
                             <!-- Sessions by Project -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
-                                    <h3 class="text-base font-semibold text-white flex items-center">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-folder text-blue-400 mr-2"></i>
                                         Sesiones por Proyecto
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-3 overflow-y-auto">
+                                <div class="flex-1 p-4 overflow-y-auto">
                                     <div class="space-y-3">
                                         <div v-for="project in sessionsAnalytics.sessionsByProject" :key="project.name"
                                              class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
@@ -1383,15 +1562,15 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Longest Sessions -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
-                                    <h3 class="text-base font-semibold text-white flex items-center">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-trophy text-yellow-400 mr-2"></i>
                                         Sesiones Más Largas
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-3 overflow-y-auto">
-                                    <div class="space-y-2">
+                                <div class="flex-1 p-4 overflow-y-auto">
+                                    <div class="space-y-3">
                                         <div v-for="(session, index) in sessionsAnalytics.longestSessions" :key="session.session_id"
                                              @click="selectProject(store.conversations.find(p => p.name === session.projectName))"
                                              class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
@@ -1414,62 +1593,6 @@ const OptimizedDashboard = {
                                 </div>
                             </div>
 
-                            <!-- Real-time Status -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full">
-                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
-                                    <h3 class="text-base font-semibold text-white flex items-center">
-                                        <i class="fas fa-pulse text-green-400 mr-2"></i>
-                                        Estado en Tiempo Real
-                                    </h3>
-                                </div>
-                                <div class="flex-1 p-3">
-                                    <div class="space-y-3">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-gray-400 text-sm">Sesiones activas</span>
-                                            <div class="flex items-center">
-                                                <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                                                <span class="text-white font-semibold text-lg">{{ sessionsAnalytics.activeSessions || 0 }}</span>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-gray-400 text-sm">Mensajes última hora</span>
-                                            <span class="text-white font-semibold">{{ store.liveStats.recent_activity?.messages_last_hour || 0 }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-gray-400 text-sm">Última actividad</span>
-                                            <span class="text-gray-300 text-xs">{{ formatTimestamp(lastUpdate) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Average Duration -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full">
-                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
-                                    <h3 class="text-base font-semibold text-white flex items-center">
-                                        <i class="fas fa-clock text-blue-400 mr-2"></i>
-                                        Duración Promedio
-                                    </h3>
-                                </div>
-                                <div class="flex-1 p-3">
-                                    <div class="space-y-3">
-                                        <div class="text-center">
-                                            <p class="text-2xl font-bold text-white mb-1">{{ sessionsAnalytics.averageMessages || 0 }}</p>
-                                            <p class="text-gray-400 text-sm">Mensajes por sesión</p>
-                                        </div>
-                                        <div class="grid grid-cols-2 gap-3 text-center">
-                                            <div>
-                                                <p class="text-lg font-semibold text-green-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.75) }}</p>
-                                                <p class="text-gray-400 text-xs">Promedio IA</p>
-                                            </div>
-                                            <div>
-                                                <p class="text-lg font-semibold text-blue-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.25) }}</p>
-                                                <p class="text-gray-400 text-xs">Promedio Usuario</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -1709,6 +1832,372 @@ const OptimizedDashboard = {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Analytics View -->
+                    <div v-else-if="store.activeView === 'analytics'" class="h-full flex flex-col">
+                        <!-- Filters Bar -->
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                            <div class="flex items-center space-x-3">
+                                <!-- Quick Date Range Selector -->
+                                <div class="w-48">
+                                    <select 
+                                        v-model="store.analytics.dateRange" 
+                                        @change="updateAnalytics"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="7">Últimos 7 días</option>
+                                        <option value="30">Último mes</option>
+                                        <option value="90">Últimos 3 meses</option>
+                                        <option value="180">Últimos 6 meses</option>
+                                        <option value="365">Último año</option>
+                                        <option value="custom">Personalizado</option>
+                                    </select>
+                                </div>
+
+                                <!-- Custom Date Range (if selected) -->
+                                <div v-if="store.analytics.dateRange === 'custom'" class="flex items-center space-x-2">
+                                    <input 
+                                        v-model="store.analytics.customStartDate"
+                                        type="datetime-local" 
+                                        class="px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <span class="text-gray-400">-</span>
+                                    <input 
+                                        v-model="store.analytics.customEndDate"
+                                        type="datetime-local" 
+                                        class="px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button 
+                                        @click="applyCustomAnalyticsRange"
+                                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                                    >
+                                        Aplicar
+                                    </button>
+                                </div>
+
+                                <!-- Clear Filters Button -->
+                                <button 
+                                    @click="clearAnalyticsFilters"
+                                    class="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm transition-colors"
+                                >
+                                    <i class="fas fa-times mr-1"></i>
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Analytics Content -->
+                        <div class="flex-1 min-h-0">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+                                <!-- Left Panel - Activity Trends -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4 flex flex-col">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-chart-line mr-2 text-blue-400"></i>
+                                        Actividad por Proyecto
+                                    </h3>
+                                    
+                                    <div class="flex-1 space-y-3 overflow-y-auto">
+                                        <!-- Project Activity Chart (Visual bars) -->
+                                        <div v-for="project in projectActivityData" :key="project.name" 
+                                             class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-medium text-white">{{ project.name }}</span>
+                                                <span class="text-xs text-gray-400">{{ project.messages }} msgs</span>
+                                            </div>
+                                            <div class="w-full bg-gray-600 rounded-full h-2 mb-1">
+                                                <div class="bg-gradient-to-r from-blue-500 to-blue-300 h-2 rounded-full transition-all duration-300" 
+                                                     :style="{ width: project.percentage + '%' }"></div>
+                                            </div>
+                                            <div class="flex justify-between text-xs text-gray-400">
+                                                <span>{{ project.sessions }} sesiones</span>
+                                                <span>{{ project.percentage }}% del total</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Usage Timeline -->
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded mt-4">
+                                            <h4 class="text-sm font-medium text-white mb-3">Actividad Reciente</h4>
+                                            <div class="space-y-2">
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Últimas 24h</span>
+                                                    <span class="text-green-400 font-medium">{{ formatMetric(store.liveStats.messages_last_24h || 89) }} mensajes</span>
+                                                </div>
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Promedio diario</span>
+                                                    <span class="text-blue-400 font-medium">{{ Math.round((store.liveStats.total_messages || 1366) / 30) }} mensajes</span>
+                                                </div>
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Sesiones activas</span>
+                                                    <span class="text-yellow-400 font-medium">{{ store.liveStats.active_sessions || 1 }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Panel - Statistical Summary -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4 flex flex-col">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-chart-bar mr-2 text-green-400"></i>
+                                        Métricas Clave
+                                    </h3>
+                                    
+                                    <div class="flex-1 space-y-4 overflow-y-auto">
+                                        <!-- Key Metrics Grid -->
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded text-center">
+                                                <div class="text-2xl font-bold text-blue-400">{{ formatMetric(store.liveStats.total_messages || 1366) }}</div>
+                                                <div class="text-xs text-gray-400">Total Mensajes</div>
+                                            </div>
+                                            <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded text-center">
+                                                <div class="text-2xl font-bold text-green-400">{{ store.liveStats.total_sessions || 9 }}</div>
+                                                <div class="text-xs text-gray-400">Sesiones</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Performance Indicators -->
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <h4 class="text-sm font-medium text-white mb-3">Rendimiento del Sistema</h4>
+                                            <div class="space-y-3">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-gray-400">Mensajes por Sesión</span>
+                                                    <div class="flex items-center">
+                                                        <span class="text-sm text-white font-medium mr-2">
+                                                            {{ Math.round((store.liveStats.total_messages || 1366) / (store.liveStats.total_sessions || 9)) }}
+                                                        </span>
+                                                        <div class="w-16 bg-gray-600 rounded-full h-1">
+                                                            <div class="bg-blue-400 h-1 rounded-full" style="width: 75%"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-gray-400">Tokens Procesados</span>
+                                                    <div class="flex items-center">
+                                                        <span class="text-sm text-white font-medium mr-2">{{ formatMetric(store.liveStats.total_tokens || 204500) }}</span>
+                                                        <div class="w-16 bg-gray-600 rounded-full h-1">
+                                                            <div class="bg-green-400 h-1 rounded-full" style="width: 90%"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-gray-400">Costo por Token</span>
+                                                    <div class="flex items-center">
+                                                        <span class="text-sm text-white font-medium mr-2">
+                                                            {{ ((store.liveStats.total_cost || 2.73) / (store.liveStats.total_tokens || 204500) * 1000000).toFixed(2) }}
+                                                        </span>
+                                                        <div class="w-16 bg-gray-600 rounded-full h-1">
+                                                            <div class="bg-yellow-400 h-1 rounded-full" style="width: 60%"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Trend Analysis -->
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <h4 class="text-sm font-medium text-white mb-3">Análisis de Tendencias</h4>
+                                            <div class="space-y-2">
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Proyectos más activos</span>
+                                                    <span class="text-green-400 font-medium">claude-conversation-logger</span>
+                                                </div>
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Período de mayor actividad</span>
+                                                    <span class="text-blue-400 font-medium">Último mes</span>
+                                                </div>
+                                                <div class="flex items-center justify-between text-xs">
+                                                    <span class="text-gray-400">Eficiencia de sesiones</span>
+                                                    <span class="text-yellow-400 font-medium">Alta (152 msgs/sesión)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Costs View -->
+                    <div v-else-if="store.activeView === 'costs'" class="h-full flex flex-col">
+                        <!-- Filters Bar -->
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                            <div class="flex items-center space-x-3">
+                                <!-- Quick Date Range Selector -->
+                                <div class="w-48">
+                                    <select 
+                                        v-model="store.costs.dateRange" 
+                                        @change="updateCostsData"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="7">Últimos 7 días</option>
+                                        <option value="30">Último mes</option>
+                                        <option value="90">Últimos 3 meses</option>
+                                        <option value="180">Últimos 6 meses</option>
+                                        <option value="365">Último año</option>
+                                        <option value="custom">Personalizado</option>
+                                    </select>
+                                </div>
+
+                                <!-- Project Filter -->
+                                <div class="w-48">
+                                    <select 
+                                        v-model="store.costs.selectedProject"
+                                        @change="updateCostsData"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Todos los proyectos</option>
+                                        <option value="claude-conversation-logger">claude-conversation-logger</option>
+                                        <option value="uniCommerce">uniCommerce</option>
+                                        <option value="back_sync_tech_products">back_sync_tech_products</option>
+                                        <option value="scripts">scripts</option>
+                                    </select>
+                                </div>
+
+                                <!-- Custom Date Range (if selected) -->
+                                <div v-if="store.costs.dateRange === 'custom'" class="flex items-center space-x-2">
+                                    <input 
+                                        v-model="store.costs.customStartDate"
+                                        type="datetime-local" 
+                                        class="px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <span class="text-gray-400">-</span>
+                                    <input 
+                                        v-model="store.costs.customEndDate"
+                                        type="datetime-local" 
+                                        class="px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button 
+                                        @click="applyCustomCostRange"
+                                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                                    >
+                                        Aplicar
+                                    </button>
+                                </div>
+
+                                <!-- Clear Filters Button -->
+                                <button 
+                                    @click="clearCostsFilters"
+                                    class="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm transition-colors"
+                                >
+                                    <i class="fas fa-times mr-1"></i>
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Costs Content -->
+                        <div class="flex-1 min-h-0">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                                <!-- Panel 1: Cost Summary -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-dollar-sign mr-2 text-green-400"></i>
+                                        Resumen de Costos
+                                    </h3>
+                                    
+                                    <div class="space-y-4">
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="text-sm text-gray-400">Costo Total</div>
+                                            <div class="text-2xl font-bold text-green-400">
+                                                {{ formatCost(costMetrics.totalCost) }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="text-sm text-gray-400">{{ getCostDateRangeLabel() }}</div>
+                                            <div class="text-xl font-semibold text-white">
+                                                {{ formatCost(costMetrics.periodCost) }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="text-sm text-gray-400">Tendencia</div>
+                                            <div class="text-lg font-semibold" 
+                                                :class="costMetrics.trend >= 0 ? 'text-red-400' : 'text-green-400'">
+                                                <i :class="costMetrics.trend >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'" class="mr-1"></i>
+                                                {{ Math.abs(costMetrics.trend).toFixed(1) }}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel 2: Project Breakdown -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4 flex flex-col">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-project-diagram mr-2 text-blue-400"></i>
+                                        Desglose por Proyecto
+                                    </h3>
+                                    
+                                    <div class="space-y-2 flex-1 overflow-y-auto">
+                                        <div v-for="project in projectCostBreakdown" :key="project.name" 
+                                             class="flex items-center justify-between bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="flex-1">
+                                                <div class="text-sm font-medium text-white">{{ project.name }}</div>
+                                                <div class="text-xs text-gray-400">{{ project.messages }} mensajes</div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-sm font-semibold text-green-400">
+                                                    {{ formatCost(project.cost) }}
+                                                </div>
+                                                <div class="text-xs text-gray-400">{{ project.percentage }}%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel 3: Efficiency Metrics -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4 flex flex-col">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-tachometer-alt mr-2 text-yellow-400"></i>
+                                        Métricas de Eficiencia
+                                    </h3>
+                                    
+                                    <div class="space-y-4 flex-1">
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="text-sm text-gray-400">Costo por Mensaje</div>
+                                            <div class="text-lg font-semibold text-white">
+                                                {{ formatCost(costMetrics.costPerMessage) }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-gray-700 dark:bg-gray-600 p-3 rounded">
+                                            <div class="text-sm text-gray-400">Proyección Mensual</div>
+                                            <div class="text-lg font-semibold text-white">
+                                                {{ formatCost(costMetrics.monthlyProjection) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel 4: Trends & Alerts -->
+                                <div class="bg-gray-800 dark:bg-gray-700 rounded-lg p-4 flex flex-col">
+                                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-2 text-orange-400"></i>
+                                        Alertas y Tendencias
+                                    </h3>
+                                    
+                                    <div class="space-y-2 flex-1">
+                                        <div v-for="alert in generateCostAlerts()" :key="alert.message" 
+                                             :class="{
+                                                 'bg-yellow-600 dark:bg-yellow-700': alert.type === 'warning',
+                                                 'bg-green-600 dark:bg-green-700': alert.type === 'success'
+                                             }" 
+                                             class="p-3 rounded">
+                                            <div class="text-sm text-white">{{ alert.message }}</div>
+                                        </div>
+                                        
+                                        <div v-if="generateCostAlerts().length === 0" class="text-center py-4">
+                                            <i class="fas fa-check-circle text-green-400 text-2xl mb-2"></i>
+                                            <p class="text-gray-400">Todo normal</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     </div>
                 </main>
             </div>

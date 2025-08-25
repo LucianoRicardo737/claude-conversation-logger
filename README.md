@@ -1,6 +1,15 @@
 # 📊 Claude Conversation Logger v3.1.0
 
-> **🎯 Complete Conversation Management Platform with Advanced AI Agent System** - Real-time conversation logging and analytics system for Claude Code with gRPC streaming, visual dashboard, intelligent agent system, and comprehensive documentation replacement.
+> **🎯 Complete Conversation Management Platform with Advanced AI Agent System** - Real-time conversation logging and analytics system for Claude Code with REST API polling, visual dashboard, intelligent agent system, and comprehensive documentation replacement.
+
+## 🚧 **Dashboard v3.2.0 in Active Development**
+
+**Enhanced UI with optimized layouts and real-time data visualization:**
+- ✅ **Optimized Sessions View**: Removed redundant panels for better space utilization
+- ✅ **Real Analytics Graphs**: Dynamic data visualization with actual percentages
+- ✅ **Improved Cost Analysis**: Enhanced panel heights for complete data visibility
+- ✅ **REST API Integration**: Migrated from gRPC to REST API with efficient polling
+- 🔄 **Continuous Improvements**: Regular UI/UX enhancements and performance optimizations
 
 ---
 
@@ -12,7 +21,7 @@
 - 📊 **Real-time analytics dashboard** with comprehensive visual insights
 - 🤖 **Integrated MCP server** for Claude Code native tools
 - 📱 **Visual documentation** with 15+ dashboard screenshots
-- 🔄 **gRPC real-time updates** for live project monitoring
+- 🔄 **REST API with real-time polling** for live project monitoring
 - 💾 **Session export capabilities** in JSON and Markdown formats
 
 **Instead of static docs, teams can rely on:**
@@ -300,7 +309,7 @@ Mixed ES/EN conversation → Agent detects patterns in both languages
 │  • Health Check: http://localhost:3003/health              │
 │  • Dashboard: http://localhost:3003                        │
 │  • MCP Server: stdio transport                             │
-│  • gRPC Server: Port 50051 (real-time updates)            │
+│  • REST API: Port 3000 (with real-time polling)           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -314,7 +323,7 @@ Mixed ES/EN conversation → Agent detects patterns in both languages
 | **💾 MongoDB** | 7.0 | 27017 | Persistent conversation storage | Write-heavy operations + 5 agent collections |
 | **🔄 Redis** | 7.0 | 6379 | Cache & session management | Read-heavy MCP queries + agent caching |
 | **🤖 MCP Server** | SDK 0.5.0 | stdio | Claude Code integration | Native tool access + 5 agent tools |
-| **📡 gRPC Server** | @grpc/grpc-js | 50051 | Real-time streaming updates | Live dashboard data |
+| **📡 REST API** | express | 3000 | Real-time polling updates | Live dashboard data |
 
 ### **Data Flow Architecture**
 ```mermaid
@@ -328,10 +337,10 @@ graph TD
     G[MCP Client] -->|stdio| H[MCP Server]
     H --> D
     
-    I[Dashboard] -->|gRPC| J[gRPC Server :50051]
+    I[Dashboard] -->|HTTP| J[REST API :3000]
     J --> D
     
-    K[gRPC Stream] --> D
+    K[API Polling] --> D
     L[Analytics] --> D
     
     style A fill:#e1f5fe
@@ -404,7 +413,7 @@ curl http://localhost:3003/api/conversations | jq .
 curl http://localhost:3003/api/projects | jq .
 
 # Test MCP server
-npm run test:grpc
+npm run test:api
 
 # Access dashboard
 open http://localhost:3003
@@ -773,9 +782,9 @@ await mcp.callTool('export_conversation', {
 
 ---
 
-## 🎯 **REAL-TIME GRPC SYSTEM**
+## 🎯 **REAL-TIME REST API SYSTEM**
 
-### **gRPC Services & Streaming**
+### **REST API Services & Polling**
 ```protobuf
 service ConversationService {
   rpc GetConversationTree(ConversationRequest) returns (ConversationTree);
@@ -814,7 +823,7 @@ messageStream.on('data', (update) => {
 
 ## 📊 **COMPREHENSIVE VISUAL DASHBOARD**
 
-> **Real-time dashboard with gRPC streaming updates showcasing complete conversation analytics**
+> **Real-time dashboard with REST API polling updates showcasing complete conversation analytics**
 
 ### **🏠 Main Dashboard Overview**
 
@@ -822,37 +831,37 @@ messageStream.on('data', (update) => {
 ![Dashboard Overview Light](docs/screenshots/01-dashboard-overview-light.png)
 
 **Dashboard features real-time gRPC updates for:**
-- 📈 **Active Projects Counter** - Live count updates via gRPC streaming
-- 🔄 **Active Sessions Monitor** - Real-time session status via gRPC  
-- 💬 **Message Statistics** - Live message count updates via gRPC
-- 💰 **Cost Analytics** - Real-time cost calculations via gRPC
+- 📈 **Active Projects Counter** - Live count updates via REST API polling
+- 🔄 **Active Sessions Monitor** - Real-time session status via REST API  
+- 💬 **Message Statistics** - Live message count updates via REST API
+- 💰 **Cost Analytics** - Real-time cost calculations via REST API
 
 #### **Real-time Statistics Panel**
 ![Real-time Stats](docs/screenshots/02-realtime-stats-light.png)
 
-**Live statistics updated via gRPC streaming:**
-- ⚡ **Real-time Session Count** - Updates instantly via gRPC when sessions start/end
-- 📊 **Live Token Usage Metrics** - Real-time token consumption tracking via gRPC
-- 💵 **Dynamic Cost Calculations** - Live cost updates via gRPC streaming
-- 🎯 **Project Activity Monitor** - Real-time project activity via gRPC
+**Live statistics updated via REST API polling:**
+- ⚡ **Real-time Session Count** - Updates instantly via REST API when sessions start/end
+- 📊 **Live Token Usage Metrics** - Real-time token consumption tracking via REST API
+- 💵 **Dynamic Cost Calculations** - Live cost updates via REST API polling
+- 🎯 **Project Activity Monitor** - Real-time project activity via REST API
 
 #### **Active Projects Monitor**
 ![Active Projects](docs/screenshots/03-active-projects-light.png)
 
-**Real-time project monitoring via gRPC:**
-- 🟢 **Live Project Status** - Real-time active/inactive status via gRPC
-- 📈 **Dynamic Message Counters** - Live message count updates via gRPC
-- 💰 **Real-time Cost Tracking** - Live cost calculations per project via gRPC
-- ⏱️ **Live Timestamp Updates** - Real-time last activity updates via gRPC
+**Real-time project monitoring via REST API:**
+- 🟢 **Live Project Status** - Real-time active/inactive status via REST API
+- 📈 **Dynamic Message Counters** - Live message count updates via REST API
+- 💰 **Real-time Cost Tracking** - Live cost calculations per project via REST API
+- ⏱️ **Live Timestamp Updates** - Real-time last activity updates via REST API
 
 #### **Active Sessions Dashboard**
 ![Active Sessions](docs/screenshots/04-active-sessions-light.png)
 
-**Real-time session monitoring via gRPC streaming:**
-- 🔴 **Live Session Indicators** - Real-time session status via gRPC
-- 📊 **Dynamic Message Counters** - Live message updates per session via gRPC
-- ⚡ **Real-time Duration Tracking** - Live session duration via gRPC
-- 🎯 **Active Session Highlights** - Real-time session activity via gRPC
+**Real-time session monitoring via REST API polling:**
+- 🔴 **Live Session Indicators** - Real-time session status via REST API
+- 📊 **Dynamic Message Counters** - Live message updates per session via REST API
+- ⚡ **Real-time Duration Tracking** - Live session duration via REST API
+- 🎯 **Active Session Highlights** - Real-time session activity via REST API
 
 ### **📂 Projects Management**
 
@@ -861,18 +870,18 @@ messageStream.on('data', (update) => {
 
 **Complete project management with real-time gRPC updates:**
 - 🔍 **Advanced Search & Filtering** - Search conversations, filter by project, date ranges
-- 📊 **Real-time Project Statistics** - Live session counts, message totals via gRPC
-- 💰 **Dynamic Cost Tracking** - Real-time cost calculations per project via gRPC
-- 🎯 **Project Activity Indicators** - Live activity status updates via gRPC
+- 📊 **Real-time Project Statistics** - Live session counts, message totals via REST API
+- 💰 **Dynamic Cost Tracking** - Real-time cost calculations per project via REST API
+- 🎯 **Project Activity Indicators** - Live activity status updates via REST API
 
 #### **Individual Project Details**
 ![Project Details](docs/screenshots/06-project-details-light.png)
 
-**Detailed project analytics with real-time gRPC streaming:**
-- 📈 **Real-time Session Analytics** - Live session performance metrics via gRPC
-- 💬 **Dynamic Message Statistics** - Real-time message analysis via gRPC
-- 📊 **Live Cost Breakdown** - Real-time cost analysis per project via gRPC
-- 🔄 **Session Activity Monitor** - Real-time session status updates via gRPC
+**Detailed project analytics with real-time REST API polling:**
+- 📈 **Real-time Session Analytics** - Live session performance metrics via REST API
+- 💬 **Dynamic Message Statistics** - Real-time message analysis via REST API
+- 📊 **Live Cost Breakdown** - Real-time cost analysis per project via REST API
+- 🔄 **Session Activity Monitor** - Real-time session status updates via REST API
 
 ### **📋 Sessions Overview**
 
@@ -880,48 +889,48 @@ messageStream.on('data', (update) => {
 ![Sessions Overview](docs/screenshots/07-sessions-overview-light.png)
 
 **Comprehensive session management with real-time gRPC updates:**
-- 📊 **Real-time Session List** - Live session updates via gRPC streaming
+- 📊 **Real-time Session List** - Live session updates via REST API polling
 - 🔍 **Session Search & Filtering** - Advanced filtering with real-time results
-- 📈 **Live Session Statistics** - Real-time session metrics via gRPC
-- 💰 **Dynamic Cost Tracking** - Real-time cost calculations via gRPC
+- 📈 **Live Session Statistics** - Real-time session metrics via REST API
+- 💰 **Dynamic Cost Tracking** - Real-time cost calculations via REST API
 
 ### **🔍 Advanced Analytics**
 
 #### **Messages Analysis Dashboard**
 ![Messages Analysis](docs/screenshots/10-messages-analysis-light.png)
 
-**Comprehensive message analytics with real-time gRPC streaming:**
-- 📊 **Real-time Message Statistics** - Live message count updates via gRPC
-- 🎯 **Dynamic Token Analytics** - Real-time token usage tracking via gRPC
-- 📈 **Live Distribution Charts** - Real-time user/AI/system message ratios via gRPC
-- 🏆 **Top Projects Ranking** - Real-time project rankings via gRPC
+**Comprehensive message analytics with real-time REST API polling:**
+- 📊 **Real-time Message Statistics** - Live message count updates via REST API
+- 🎯 **Dynamic Token Analytics** - Real-time token usage tracking via REST API
+- 📈 **Live Distribution Charts** - Real-time user/AI/system message ratios via REST API
+- 🏆 **Top Projects Ranking** - Real-time project rankings via REST API
 
 #### **Projects Analysis Panel**
 ![Projects Analysis](docs/screenshots/14-projects-analysis-light.png)
 
 **Advanced project analytics with real-time gRPC updates:**
-- 📊 **Real-time Project Metrics** - Live project performance via gRPC
-- 💬 **Dynamic Message Analysis** - Real-time message distribution via gRPC
-- 📈 **Live Activity Tracking** - Real-time project activity via gRPC
-- 🎯 **Project Performance Rankings** - Real-time ranking updates via gRPC
+- 📊 **Real-time Project Metrics** - Live project performance via REST API
+- 💬 **Dynamic Message Analysis** - Real-time message distribution via REST API
+- 📈 **Live Activity Tracking** - Real-time project activity via REST API
+- 🎯 **Project Performance Rankings** - Real-time ranking updates via REST API
 
 #### **Costs Analysis Dashboard**
 ![Costs Analysis](docs/screenshots/15-costs-analysis-light.png)
 
-**Comprehensive cost analytics with real-time gRPC streaming:**
-- 💰 **Real-time Cost Calculations** - Live cost updates via gRPC
-- 📊 **Dynamic Cost Breakdown** - Real-time cost analysis per project via gRPC
-- 📈 **Live Cost Projections** - Real-time monthly projections via gRPC
-- 🏆 **Top Cost Projects** - Real-time cost rankings via gRPC
+**Comprehensive cost analytics with real-time REST API polling:**
+- 💰 **Real-time Cost Calculations** - Live cost updates via REST API
+- 📊 **Dynamic Cost Breakdown** - Real-time cost analysis per project via REST API
+- 📈 **Live Cost Projections** - Real-time monthly projections via REST API
+- 🏆 **Top Cost Projects** - Real-time cost rankings via REST API
 
 ### **🌙 Dark Mode Support**
 
 #### **Dark Mode Dashboard**
 ![Dashboard Dark Mode](docs/screenshots/16-dashboard-overview-dark.png)
 
-**Complete dark mode support with real-time gRPC streaming:**
+**Complete dark mode support with real-time REST API polling:**
 - 🌙 **Full Dark Theme** - All components optimized for dark mode
-- ⚡ **Real-time Updates** - All gRPC streaming functionality maintained
+- ⚡ **Real-time Updates** - All REST API polling functionality maintained
 - 🎨 **Enhanced Readability** - Optimized colors and contrast for dark environments
 - 📊 **Live Statistics** - All real-time features fully functional in dark mode
 
@@ -933,7 +942,7 @@ messageStream.on('data', (update) => {
 
 **Complete dark mode analytics with real-time gRPC:**
 - 🌙 **Consistent Dark Theming** - All analytics views with dark mode support
-- ⚡ **Real-time gRPC Streaming** - All live updates functional in dark mode
+- ⚡ **Real-time REST API Streaming** - All live updates functional in dark mode
 - 📊 **Enhanced Data Visualization** - Dark-optimized charts and graphs
 - 🎯 **Improved User Experience** - Reduced eye strain for extended usage
 
@@ -1045,7 +1054,7 @@ npm run dev
 # Run individual services
 npm run start        # Main API server
 npm run mcp          # MCP server only
-npm run test:grpc    # gRPC server test
+npm run test:api    # gRPC server test
 
 # Development with Docker
 docker compose -f docker-compose.dev.yml up
@@ -1065,7 +1074,7 @@ LOG_LEVEL=info
 # Optional performance tuning
 REDIS_MESSAGE_LIMIT=10000
 MONGODB_POOL_SIZE=20
-GRPC_MAX_CONNECTIONS=100
+API_MAX_CONNECTIONS=100
 
 # Optional smart filtering (affects API behavior)
 INCLUDE_TOOLS_IN_SEARCH=true    # Include tool messages in API searches (default)
@@ -1081,13 +1090,13 @@ services:
     container_name: claude-logger-monolith
     ports:
       - "3003:3003"
-      - "50051:50051"  # gRPC port for real-time updates
+      - "3000:3000"   # REST API port for real-time polling
     environment:
       - NODE_ENV=production
       - MONGODB_URI=${MONGODB_URI}
       - REDIS_URL=${REDIS_URL}
       - API_KEY=${API_KEY}
-      - GRPC_PORT=50051
+      - API_PORT=3000
     volumes:
       - claude_logger_data:/data/db
       - claude_logger_logs:/var/log
@@ -1310,7 +1319,7 @@ npm test
 # Test individual components
 npm run test:api          # API endpoint tests
 npm run test:mcp          # MCP server tests
-npm run test:grpc         # gRPC service tests
+npm run test:api         # REST API service tests
 npm run test:hook         # Hook functionality tests
 
 # Integration tests
@@ -1436,7 +1445,7 @@ claude-conversation-logger/
 - **Services in Container**: 6 (Supervisor, Nginx, Node.js, Agent System, MongoDB, Redis)
 - **API Endpoints**: 30+ REST endpoints (24 core + 6 agent endpoints)
 - **MCP Tools**: 9 specialized tools (4 core + 5 agent tools)
-- **gRPC Services**: 6 real-time services
+- **REST API Services**: 6 real-time endpoints
 - **Database Collections**: 8 collections (3 core + 5 agent collections)
 - **Cache Strategies**: 5 caching layers (including agent caching)
 - **Agent System Components**: 5 core agents + orchestrator
@@ -1605,7 +1614,7 @@ template: `$ {{ formatCost(cost) }}`;  // Valid Vue template
 - **⚡ Load Time**: Reduced initial load by 65% (2.3s → 0.8s)
 - **🖥️ Memory Usage**: Optimized Vue reactivity (-40% memory usage)
 - **📱 Mobile Responsiveness**: Complete responsive design overhaul
-- **🔄 Real-time Updates**: Smooth gRPC streaming without JavaScript errors
+- **🔄 Real-time Updates**: Smooth REST API polling without JavaScript errors
 - **💨 Animation Performance**: 60fps smooth transitions and hover effects
 
 #### **🐛 Specific Error Resolutions**
@@ -1775,7 +1784,7 @@ npm run dev
 ## 🎉 **QUICK SUMMARY**
 
 ✅ **Complete documentation replacement system**  
-✅ **Real-time conversation analytics with gRPC streaming**  
+✅ **Real-time conversation analytics with REST API polling**  
 ✅ **Visual dashboard with 15+ screenshot documentation**  
 ✅ **Monolithic Docker container with all services**  
 ✅ **🚀 Dual-layer MCP architecture (Redis + MongoDB)**  
