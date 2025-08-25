@@ -1026,7 +1026,7 @@ const OptimizedDashboard = {
                         <!-- Main Dashboard Content Grid -->
                         <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 overflow-hidden">
                             <!-- Proyectos Más Activos -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-96">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col h-full">
                                 <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
@@ -1095,7 +1095,7 @@ const OptimizedDashboard = {
                             </div>
                             
                             <!-- Sesiones Activas - Temporalmente simplificado -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-96">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col h-full">
                                 <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
