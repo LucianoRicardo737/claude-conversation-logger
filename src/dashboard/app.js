@@ -1310,7 +1310,7 @@ const OptimizedDashboard = {
                     <div v-else-if="store.activeView === 'sessions'" class="h-full flex flex-col">
 
                         <!-- Statistics Cards -->
-                        <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                             <!-- Total Sessions -->
                             <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
                                 <div class="flex items-center">
@@ -1365,17 +1365,17 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Analytics Grid -->
-                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0" style="height: calc(100vh - 200px);">
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0" style="height: calc(100vh - 180px);">
                             <!-- Sessions by Project -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
-                                    <h3 class="text-lg font-semibold text-white flex items-center">
-                                        <i class="fas fa-folder text-blue-400 mr-3"></i>
+                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
+                                    <h3 class="text-base font-semibold text-white flex items-center">
+                                        <i class="fas fa-folder text-blue-400 mr-2"></i>
                                         Sesiones por Proyecto
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-4 overflow-y-auto">
-                                    <div class="space-y-4">
+                                <div class="flex-1 p-3 overflow-y-auto">
+                                    <div class="space-y-3">
                                         <div v-for="project in sessionsAnalytics.sessionsByProject" :key="project.name"
                                              class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
                                             <div class="flex-1">
@@ -1393,14 +1393,14 @@ const OptimizedDashboard = {
 
                             <!-- Longest Sessions -->
                             <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
-                                    <h3 class="text-lg font-semibold text-white flex items-center">
-                                        <i class="fas fa-trophy text-yellow-400 mr-3"></i>
+                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
+                                    <h3 class="text-base font-semibold text-white flex items-center">
+                                        <i class="fas fa-trophy text-yellow-400 mr-2"></i>
                                         Sesiones Más Largas
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-4 overflow-y-auto">
-                                    <div class="space-y-3">
+                                <div class="flex-1 p-3 overflow-y-auto">
+                                    <div class="space-y-2">
                                         <div v-for="(session, index) in sessionsAnalytics.longestSessions" :key="session.session_id"
                                              @click="selectProject(store.conversations.find(p => p.name === session.projectName))"
                                              class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
@@ -1424,55 +1424,55 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Real-time Status -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
-                                    <h3 class="text-lg font-semibold text-white flex items-center">
-                                        <i class="fas fa-pulse text-green-400 mr-3"></i>
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full">
+                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
+                                    <h3 class="text-base font-semibold text-white flex items-center">
+                                        <i class="fas fa-pulse text-green-400 mr-2"></i>
                                         Estado en Tiempo Real
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-4 overflow-y-auto">
-                                    <div class="space-y-4">
+                                <div class="flex-1 p-3">
+                                    <div class="space-y-3">
                                         <div class="flex items-center justify-between">
-                                            <span class="text-gray-400">Sesiones activas</span>
+                                            <span class="text-gray-400 text-sm">Sesiones activas</span>
                                             <div class="flex items-center">
-                                                <div class="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                                                <span class="text-white font-semibold">{{ sessionsAnalytics.activeSessions || 0 }}</span>
+                                                <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                                <span class="text-white font-semibold text-lg">{{ sessionsAnalytics.activeSessions || 0 }}</span>
                                             </div>
                                         </div>
                                         <div class="flex items-center justify-between">
-                                            <span class="text-gray-400">Mensajes última hora</span>
+                                            <span class="text-gray-400 text-sm">Mensajes última hora</span>
                                             <span class="text-white font-semibold">{{ store.liveStats.recent_activity?.messages_last_hour || 0 }}</span>
                                         </div>
                                         <div class="flex items-center justify-between">
-                                            <span class="text-gray-400">Última actividad</span>
-                                            <span class="text-gray-300 text-sm">{{ formatTimestamp(lastUpdate) }}</span>
+                                            <span class="text-gray-400 text-sm">Última actividad</span>
+                                            <span class="text-gray-300 text-xs">{{ formatTimestamp(lastUpdate) }}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Average Duration -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
-                                <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
-                                    <h3 class="text-lg font-semibold text-white flex items-center">
-                                        <i class="fas fa-clock text-blue-400 mr-3"></i>
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full">
+                                <div class="flex-shrink-0 px-4 py-2 border-b border-gray-700">
+                                    <h3 class="text-base font-semibold text-white flex items-center">
+                                        <i class="fas fa-clock text-blue-400 mr-2"></i>
                                         Duración Promedio
                                     </h3>
                                 </div>
-                                <div class="flex-1 p-4 overflow-y-auto">
-                                    <div class="space-y-4">
+                                <div class="flex-1 p-3">
+                                    <div class="space-y-3">
                                         <div class="text-center">
-                                            <p class="text-3xl font-bold text-white mb-2">{{ sessionsAnalytics.averageMessages || 0 }}</p>
-                                            <p class="text-gray-400">Mensajes por sesión</p>
+                                            <p class="text-2xl font-bold text-white mb-1">{{ sessionsAnalytics.averageMessages || 0 }}</p>
+                                            <p class="text-gray-400 text-sm">Mensajes por sesión</p>
                                         </div>
-                                        <div class="grid grid-cols-2 gap-4 text-center">
+                                        <div class="grid grid-cols-2 gap-3 text-center">
                                             <div>
-                                                <p class="text-xl font-semibold text-green-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.75) }}</p>
+                                                <p class="text-lg font-semibold text-green-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.75) }}</p>
                                                 <p class="text-gray-400 text-xs">Promedio IA</p>
                                             </div>
                                             <div>
-                                                <p class="text-xl font-semibold text-blue-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.25) }}</p>
+                                                <p class="text-lg font-semibold text-blue-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.25) }}</p>
                                                 <p class="text-gray-400 text-xs">Promedio Usuario</p>
                                             </div>
                                         </div>
