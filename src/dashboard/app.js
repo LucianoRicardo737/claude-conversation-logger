@@ -1308,15 +1308,6 @@ const OptimizedDashboard = {
 
                     <!-- Sessions Analytics Dashboard -->
                     <div v-else-if="store.activeView === 'sessions'" class="h-full flex flex-col">
-                        <!-- Header -->
-                        <div class="flex-shrink-0 mb-4">
-                            <div class="flex items-center justify-end">
-                                <button @click="setActiveView('dashboard')" 
-                                        class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
-                                    <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
-                                </button>
-                            </div>
-                        </div>
 
                         <!-- Statistics Cards -->
                         <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -1374,9 +1365,9 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Analytics Grid -->
-                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden min-h-0">
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0" style="height: calc(100vh - 200px);">
                             <!-- Sessions by Project -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
                                 <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-folder text-blue-400 mr-3"></i>
@@ -1401,7 +1392,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Longest Sessions -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
                                 <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-trophy text-yellow-400 mr-3"></i>
@@ -1433,7 +1424,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Real-time Status -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
                                 <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-pulse text-green-400 mr-3"></i>
@@ -1462,7 +1453,7 @@ const OptimizedDashboard = {
                             </div>
 
                             <!-- Average Duration -->
-                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col h-full max-h-80">
                                 <div class="flex-shrink-0 px-4 py-3 border-b border-gray-700">
                                     <h3 class="text-lg font-semibold text-white flex items-center">
                                         <i class="fas fa-clock text-blue-400 mr-3"></i>
