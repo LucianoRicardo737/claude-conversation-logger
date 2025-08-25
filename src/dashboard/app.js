@@ -26,6 +26,7 @@ const store = reactive({
     
     // UI state
     activeView: 'dashboard',
+    previousView: null, // Track previous view for navigation
     isLoading: false,
     loadingMessage: '',
     error: null,
@@ -34,11 +35,21 @@ const store = reactive({
     searchQuery: '',
     searchFilters: {
         project: '',
-        messageType: '',
+        category: '',
         startDate: '',
         endDate: '',
         onlyMarked: false,
         tags: []
+    },
+    
+    // Messages page data
+    allMessages: [],
+    messageFilters: {
+        search: '',
+        messageType: '',
+        project: '',
+        startDate: '',
+        endDate: ''
     },
     
     // Real-time stats
@@ -60,10 +71,8 @@ const store = reactive({
     virtualScrollEnabled: true,
     pageSize: 50,
     
-    // Theme
-    isDarkMode: localStorage.getItem('claude-dashboard-theme') === 'dark' || 
-                (!localStorage.getItem('claude-dashboard-theme') && 
-                 window.matchMedia('(prefers-color-scheme: dark)').matches)
+    // Theme - Always start in dark mode
+    isDarkMode: true
 });
 
 // Enhanced Dashboard Component
@@ -116,10 +125,71 @@ const OptimizedDashboard = {
             
             // Compute filtered results
             const projects = this.store.conversations.filter(project => {
+                // Text search filter (don't modify - it works correctly)
                 if (this.store.searchFilters.project && 
                     !project.name.toLowerCase().includes(this.store.searchFilters.project.toLowerCase())) {
                     return false;
                 }
+                
+                // Category filter
+                if (this.store.searchFilters.category) {
+                    try {
+                        const lastActivity = new Date(project.last_activity);
+                        const now = new Date();
+                        
+                        // Validate dates before calculations
+                        if (isNaN(lastActivity.getTime()) || isNaN(now.getTime())) {
+                            console.warn('Invalid date in category filter:', project.last_activity);
+                            return true; // Don't filter out if dates are invalid
+                        }
+                        
+                        const hoursDiff = (now - lastActivity) / (1000 * 60 * 60);
+                        
+                        switch (this.store.searchFilters.category) {
+                            case 'active':
+                                if (hoursDiff > 24) return false; // Active in last 24h
+                                break;
+                            case 'recent':
+                                if (hoursDiff > 168) return false; // Recent activity (last week)
+                                break;
+                            case 'high-traffic':
+                                // Use message_count with fallback to 0
+                                const messageCount = project.message_count || 0;
+                                if (messageCount < 50) return false; // High traffic (50+ messages)
+                                break;
+                        }
+                    } catch (error) {
+                        console.warn('Category filter error:', error);
+                        // If processing fails, don't filter out the project
+                    }
+                }
+                
+                // Date filter
+                if (this.store.searchFilters.startDate) {
+                    try {
+                        const filterDate = new Date(this.store.searchFilters.startDate);
+                        const projectDate = new Date(project.last_activity);
+                        
+                        // Normalize dates to start of day for fair comparison
+                        filterDate.setHours(0, 0, 0, 0);
+                        projectDate.setHours(0, 0, 0, 0);
+                        
+                        if (projectDate < filterDate) return false;
+                    } catch (error) {
+                        console.warn('Date filter error:', error);
+                        // If date parsing fails, ignore this filter
+                    }
+                }
+                
+                // Solo marcados filter
+                if (this.store.searchFilters.onlyMarked) {
+                    // Check if any session in the project has marked conversations
+                    const hasMarkedSessions = project.sessions && project.sessions.some(session => 
+                        session.is_marked || session.status === 'marked'
+                    );
+                    if (!hasMarkedSessions) return false;
+                }
+                
                 return true;
             });
             
@@ -133,7 +203,7 @@ const OptimizedDashboard = {
 
         hasActiveFilters() {
             const filters = this.store.searchFilters;
-            return filters.project || filters.messageType || filters.startDate || 
+            return filters.project || filters.category || filters.startDate || 
                    filters.endDate || filters.onlyMarked || filters.tags.length > 0;
         },
 
@@ -147,6 +217,119 @@ const OptimizedDashboard = {
             return this.filteredProjects.reduce((total, project) => 
                 total + (project.message_count || 0), 0
             );
+        },
+
+        filteredMessages() {
+            if (!this.store.allMessages || !this.store.allMessages.length) {
+                console.log('No messages available for filtering');
+                return [];
+            }
+            
+            console.log('Filtering messages:', {
+                total: this.store.allMessages.length,
+                filters: this.store.messageFilters
+            });
+            
+            return this.store.allMessages.filter(message => {
+                // Text search filter
+                if (this.store.messageFilters.search && 
+                    !message.content.toLowerCase().includes(this.store.messageFilters.search.toLowerCase())) {
+                    return false;
+                }
+                
+                // Message type filter
+                if (this.store.messageFilters.messageType && 
+                    message.type !== this.store.messageFilters.messageType) {
+                    return false;
+                }
+                
+                // Project filter
+                if (this.store.messageFilters.project && 
+                    message.project_name !== this.store.messageFilters.project) {
+                    return false;
+                }
+                
+                // Date filter
+                if (this.store.messageFilters.startDate) {
+                    try {
+                        const filterDate = new Date(this.store.messageFilters.startDate);
+                        const messageDate = new Date(message.timestamp);
+                        filterDate.setHours(0, 0, 0, 0);
+                        messageDate.setHours(0, 0, 0, 0);
+                        if (messageDate < filterDate) return false;
+                    } catch (error) {
+                        console.warn('Date filter error in messages:', error);
+                    }
+                }
+                
+                return true;
+            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        },
+
+        // Session Analytics Computed Properties
+        sessionsAnalytics() {
+            if (!this.store.conversations || !this.store.conversations.length) return {};
+            
+            const analytics = {
+                totalSessions: 0,
+                activeSessions: 0,
+                totalMessages: 0,
+                sessionsByProject: [],
+                longestSessions: [],
+                averageMessages: 0,
+                activityRate: 0
+            };
+            
+            const allSessions = [];
+            
+            // Process each project
+            this.store.conversations.forEach(project => {
+                if (project.sessions && project.sessions.length > 0) {
+                    analytics.totalSessions += project.sessions.length;
+                    
+                    // Count active sessions and collect all sessions
+                    const activeSessions = project.sessions.filter(session => 
+                        session.status === 'active' || 
+                        (session.last_message && new Date() - new Date(session.last_message) < 24 * 60 * 60 * 1000)
+                    );
+                    
+                    analytics.activeSessions += activeSessions.length;
+                    
+                    // Add to sessions by project
+                    analytics.sessionsByProject.push({
+                        name: project.name,
+                        sessionCount: project.sessions.length,
+                        messageCount: project.message_count || 0,
+                        activeCount: activeSessions.length
+                    });
+                    
+                    // Collect all sessions for longest sessions analysis
+                    project.sessions.forEach(session => {
+                        allSessions.push({
+                            ...session,
+                            projectName: project.name,
+                            messageCount: session.message_count || 0
+                        });
+                        analytics.totalMessages += session.message_count || 0;
+                    });
+                }
+            });
+            
+            // Calculate averages
+            if (analytics.totalSessions > 0) {
+                analytics.averageMessages = Math.round(analytics.totalMessages / analytics.totalSessions);
+                analytics.activityRate = Math.round((analytics.activeSessions / analytics.totalSessions) * 100);
+            }
+            
+            // Sort projects by session count
+            analytics.sessionsByProject.sort((a, b) => b.sessionCount - a.sessionCount);
+            
+            // Get longest sessions
+            analytics.longestSessions = allSessions
+                .sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0))
+                .slice(0, 10);
+            
+            return analytics;
         }
     },
 
@@ -215,8 +398,91 @@ const OptimizedDashboard = {
     methods: {
         // === Core Navigation ===
         setActiveView(view) {
+            // Track previous view for navigation
+            this.store.previousView = this.store.activeView;
             this.store.activeView = view;
             this.updateBreadcrumbs(view);
+            
+            // Load messages when switching to messages view
+            if (view === 'messages' && this.store.allMessages.length === 0) {
+                this.loadAllMessages();
+            }
+        },
+
+        // === Filters ===
+        clearFilters() {
+            this.store.searchFilters = {
+                project: '',
+                category: '',
+                startDate: '',
+                endDate: '',
+                onlyMarked: false,
+                tags: []
+            };
+        },
+
+        clearMessageFilters() {
+            this.store.messageFilters = {
+                search: '',
+                messageType: '',
+                project: '',
+                startDate: '',
+                endDate: ''
+            };
+        },
+
+        // === Messages Management ===
+        async loadAllMessages() {
+            await this.handleAsyncOperation(async () => {
+                console.log('📩 Loading all messages...');
+                const allMessages = [];
+                
+                // Aggregate messages from all projects and sessions
+                for (const project of this.store.conversations) {
+                    if (project.sessions && project.sessions.length > 0) {
+                        for (const session of project.sessions) {
+                            try {
+                                const sessionDetails = await apiService.getConversationDetails(session.session_id);
+                                if (sessionDetails && sessionDetails.messages) {
+                                    sessionDetails.messages.forEach(message => {
+                                        allMessages.push({
+                                            ...message,
+                                            project_name: project.name,
+                                            session_id: session.session_id,
+                                            session_description: session.description
+                                        });
+                                    });
+                                }
+                            } catch (error) {
+                                console.warn(`Failed to load messages for session ${session.session_id}:`, error);
+                            }
+                        }
+                    }
+                }
+                
+                this.store.allMessages = allMessages.sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                );
+                
+                console.log(`✅ Loaded ${allMessages.length} messages total`);
+            }, {
+                loadingMessage: 'Loading all messages...',
+                showLoading: true
+            });
+        },
+
+        selectMessage(message) {
+            // Navigate to the session containing this message
+            const project = this.store.conversations.find(p => p.name === message.project_name);
+            if (project) {
+                const session = project.sessions.find(s => s.session_id === message.session_id);
+                if (session) {
+                    // Set previous view as messages so back button returns here
+                    this.store.previousView = 'messages';
+                    this.selectProject(project);
+                    this.selectSession(session);
+                }
+            }
         },
 
         updateBreadcrumbs(view) {
@@ -545,7 +811,7 @@ const OptimizedDashboard = {
     },
 
     template: `
-        <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div class="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col">
             <!-- Loading State -->
             <div v-if="store.isLoading" class="flex items-center justify-center min-h-screen">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -569,9 +835,9 @@ const OptimizedDashboard = {
             </div>
 
             <!-- Dashboard Content -->
-            <div v-else>
+            <div v-else class="flex-1 flex flex-col overflow-hidden">
                 <!-- Navigation Header -->
-                <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+                <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                     <div class="w-full px-4 sm:px-6 lg:px-8">
                         <!-- Top Navigation Bar -->
                         <nav class="flex justify-between items-center py-4">
@@ -662,11 +928,12 @@ const OptimizedDashboard = {
                 </header>
 
                 <!-- Main Content -->
-                <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                <main class="flex-1 overflow-y-auto">
+                    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 h-full">
                     <!-- Dashboard View -->
-                    <div v-if="store.activeView === 'dashboard' && !store.isLoading" class="space-y-8">
+                    <div v-if="store.activeView === 'dashboard' && !store.isLoading" class="h-full flex flex-col space-y-8">
                         <!-- Stats Grid -->
-                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
                             <!-- Total Messages -->
                             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
                                 <div class="p-6">
@@ -757,10 +1024,10 @@ const OptimizedDashboard = {
                         </div>
 
                         <!-- Main Dashboard Content Grid -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
                             <!-- Proyectos Más Activos -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
-                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col">
+                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
                                             <div class="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mr-3">
@@ -774,7 +1041,7 @@ const OptimizedDashboard = {
                                     </div>
                                 </div>
                                 
-                                <div class="p-6">
+                                <div class="p-6 flex-1 overflow-y-auto">
                                     <div v-if="filteredProjects.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
                                         <i class="fas fa-folder-open text-3xl text-gray-300 mb-3"></i>
                                         <p>No hay proyectos disponibles</p>
@@ -828,8 +1095,8 @@ const OptimizedDashboard = {
                             </div>
                             
                             <!-- Sesiones Activas - Temporalmente simplificado -->
-                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
-                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700">
+                            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col">
+                                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
                                             <div class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mr-3">
@@ -843,7 +1110,7 @@ const OptimizedDashboard = {
                                     </div>
                                 </div>
                                 
-                                <div class="p-6">
+                                <div class="p-6 flex-1 overflow-y-auto">
                                     <div class="space-y-4">
                                         <!-- Active Session Example -->
                                         <div class="p-4 rounded-lg border border-green-100 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
@@ -891,78 +1158,338 @@ const OptimizedDashboard = {
                     </div>
 
                     <!-- Projects View -->
-                    <div v-else-if="store.activeView === 'projects'" class="space-y-6">
-                        <div class="bg-white shadow rounded-lg p-6">
-                            <h2 class="text-2xl font-bold text-gray-900 mb-6">All Projects</h2>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div v-for="project in filteredProjects" :key="project.name" 
-                                     @click="selectProject(project)"
-                                     class="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all">
-                                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ project.name }}</h3>
-                                    <div class="grid grid-cols-2 gap-4 mb-4">
-                                        <div class="text-center">
-                                            <p class="text-2xl font-bold text-blue-600">
-                                                {{ (project && project.sessions ? project.sessions.length : 0) }}
-                                            </p>
-                                            <p class="text-xs text-gray-500">Sessions</p>
-                                        </div>
-                                        <div class="text-center">
-                                            <p class="text-2xl font-bold text-green-600">
-                                                {{ formatMetric(project.message_count || 0) }}
-                                            </p>
-                                            <p class="text-xs text-gray-500">Messages</p>
-                                        </div>
-                                    </div>
-                                    <div class="text-xs text-gray-500 text-center">
-                                        Last activity: {{ formatTimestamp(project.last_activity) }}
+                    <div v-else-if="store.activeView === 'projects'" class="h-full flex flex-col">
+                        <!-- Header with breadcrumb -->
+                        <div class="flex-shrink-0 mb-6">
+                            <div class="flex items-center space-x-2 text-sm mb-4">
+                                <i class="fas fa-chart-line text-blue-500"></i>
+                                <span class="text-blue-500 cursor-pointer" @click="setActiveView('dashboard')">Dashboard</span>
+                                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                <span class="text-gray-300">Proyectos</span>
+                            </div>
+                        </div>
+
+                        <!-- Search and Filters Bar -->
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                            <div class="flex items-center space-x-3">
+                                <!-- Search Input with integrated button -->
+                                <div class="flex-1">
+                                    <div class="relative">
+                                        <input 
+                                            v-model="store.searchFilters.project"
+                                            type="text" 
+                                            placeholder="Buscar en conversaciones..."
+                                            class="w-full pl-4 pr-20 py-2 bg-gray-700 dark:bg-gray-600 text-white placeholder-gray-400 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button class="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-white text-xs">
+                                            <i class="fas fa-search mr-1"></i>
+                                            Buscar
+                                        </button>
                                     </div>
                                 </div>
+
+                                <!-- Clear Filters Button -->
+                                <button 
+                                    v-if="hasActiveFilters"
+                                    @click="clearFilters"
+                                    class="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm transition-colors"
+                                    title="Limpiar todos los filtros"
+                                >
+                                    <i class="fas fa-times mr-1"></i>
+                                    Limpiar
+                                </button>
+
+                                <!-- Project Filter -->
+                                <div class="w-48">
+                                    <select 
+                                        v-model="store.searchFilters.category"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Todos los proyectos</option>
+                                        <option value="active">Proyectos activos</option>
+                                        <option value="recent">Actividad reciente</option>
+                                        <option value="high-traffic">Alto tráfico</option>
+                                    </select>
+                                </div>
+
+
+                                <!-- Date Range -->
+                                <div class="w-32">
+                                    <input 
+                                        v-model="store.searchFilters.startDate"
+                                        type="date" 
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white placeholder-gray-400 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <!-- Solo marcados checkbox -->
+                                <label class="flex items-center text-white text-sm whitespace-nowrap">
+                                    <input 
+                                        v-model="store.searchFilters.onlyMarked"
+                                        type="checkbox" 
+                                        class="mr-2 rounded bg-gray-600 border-gray-500 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    Solo marcados
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Projects List Header -->
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-t-lg px-6 py-4 border-b border-gray-600">
+                            <div class="flex items-center">
+                                <i class="fas fa-folder text-blue-500 mr-3"></i>
+                                <h2 class="text-lg font-semibold text-white">Todos los Proyectos</h2>
+                                <span class="ml-auto text-gray-400 text-sm">{{ filteredProjects.length }} proyectos</span>
+                            </div>
+                        </div>
+
+                        <!-- Projects List Content -->
+                        <div class="flex-1 bg-gray-800 dark:bg-gray-700 rounded-b-lg overflow-y-auto">
+                            <div class="divide-y divide-gray-600">
+                                <div 
+                                    v-for="project in filteredProjects" 
+                                    :key="project.name"
+                                    @click="selectProject(project)"
+                                    class="px-6 py-4 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
+                                >
+                                    <div class="flex items-center justify-between">
+                                        <!-- Left side: Project info -->
+                                        <div class="flex-1">
+                                            <div class="flex items-center space-x-3 mb-2">
+                                                <h3 class="text-white font-medium group-hover:text-blue-400">{{ project.name }}</h3>
+                                                
+                                                <!-- Status indicators -->
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        {{ formatMetric(project.message_count || 0) }}
+                                                    </span>
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        {{ (project && project.sessions ? project.sessions.length : 0) }} activas
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Stats row -->
+                                            <div class="flex items-center space-x-4 text-sm text-gray-400">
+                                                <span>
+                                                    <i class="fas fa-comments mr-1"></i>
+                                                    {{ formatMetric(project.total_messages || project.message_count || 0) }} tokens
+                                                </span>
+                                                <span>
+                                                    &#36;{{ formatCost((project.message_count || 0) * 0.002) }}
+                                                </span>
+                                                <span>
+                                                    <i class="fas fa-clock mr-1"></i>
+                                                    {{ formatTimestamp(project.last_activity) }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Right side: Activity indicator -->
+                                        <div class="flex items-center space-x-3">
+                                            <div class="text-right">
+                                                <div class="text-white font-medium">{{ formatMetric(project.message_count || 0) }}</div>
+                                                <div class="text-gray-400 text-sm">{{ formatTimestamp(project.last_activity) }}</div>
+                                            </div>
+                                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-white transition-colors"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Empty state -->
+                            <div v-if="filteredProjects.length === 0" class="text-center py-12">
+                                <i class="fas fa-folder-open text-4xl text-gray-500 mb-4"></i>
+                                <p class="text-gray-400 text-lg mb-2">No se encontraron proyectos</p>
+                                <p class="text-gray-500 text-sm">Ajusta los filtros de búsqueda para ver más resultados</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Sessions View -->
-                    <div v-else-if="store.activeView === 'sessions' && store.selectedProject" class="space-y-6">
-                        <div class="bg-white shadow rounded-lg p-6">
-                            <div class="flex items-center justify-between mb-6">
+                    <!-- Sessions Analytics Dashboard -->
+                    <div v-else-if="store.activeView === 'sessions'" class="h-full flex flex-col">
+                        <!-- Header -->
+                        <div class="flex-shrink-0 mb-6">
+                            <div class="flex items-center justify-between">
                                 <div>
-                                    <h2 class="text-2xl font-bold text-gray-900">{{ store.selectedProject.name }}</h2>
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        {{ (store.selectedProject && store.selectedProject.sessions ? store.selectedProject.sessions.length : 0) }} sessions
+                                    <h1 class="text-3xl font-bold text-white">Análisis de Sesiones</h1>
+                                    <p class="text-gray-300 mt-1">
+                                        Vista completa de actividad y estadísticas
                                     </p>
                                 </div>
                                 <button @click="setActiveView('dashboard')" 
-                                        class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
-                                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                                        class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
+                                    <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
                                 </button>
                             </div>
-                            
-                            <div class="space-y-4">
-                                <div v-if="!store.selectedProject || !store.selectedProject.sessions || store.selectedProject.sessions.length === 0"
-                                     class="text-center py-8">
-                                    <i class="fas fa-comments text-4xl text-gray-300 mb-4"></i>
-                                    <p class="text-gray-500">No sessions found for this project</p>
+                        </div>
+
+                        <!-- Statistics Cards -->
+                        <div class="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                            <!-- Total Sessions -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-layer-group text-2xl text-blue-400"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-400">Total Sesiones</p>
+                                        <p class="text-2xl font-bold text-white">{{ sessionsAnalytics.totalSessions || 0 }}</p>
+                                    </div>
                                 </div>
-                                
-                                <div v-for="session in (store.selectedProject && store.selectedProject.sessions ? store.selectedProject.sessions : [])" :key="session.session_id"
-                                     @click="selectSession(session)"
-                                     class="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <div class="flex items-center space-x-3">
-                                            <div>
-                                                <h3 class="text-lg font-medium text-gray-900">
-                                                    Session {{ session.session_id.substring(0, 8) }}
-                                                </h3>
-                                                <p class="text-sm text-gray-500">
-                                                    {{ formatTimestamp(session.created_at || session.last_activity) }}
-                                                </p>
+                            </div>
+
+                            <!-- Active Sessions -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-play-circle text-2xl text-green-400"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-400">Sesiones Activas</p>
+                                        <p class="text-2xl font-bold text-white">{{ sessionsAnalytics.activeSessions || 0 }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Average Messages -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-chart-line text-2xl text-purple-400"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-400">Promedio Mensajes</p>
+                                        <p class="text-2xl font-bold text-white">{{ sessionsAnalytics.averageMessages || 0 }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Activity Rate -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-tachometer-alt text-2xl text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-400">Tasa de Actividad</p>
+                                        <p class="text-2xl font-bold text-white">{{ sessionsAnalytics.activityRate || 0 }}%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analytics Grid -->
+                        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden min-h-0">
+                            <!-- Sessions by Project -->
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
+                                        <i class="fas fa-folder text-blue-400 mr-3"></i>
+                                        Sesiones por Proyecto
+                                    </h3>
+                                </div>
+                                <div class="flex-1 p-6 overflow-y-auto">
+                                    <div class="space-y-4">
+                                        <div v-for="project in sessionsAnalytics.sessionsByProject" :key="project.name"
+                                             class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                                            <div class="flex-1">
+                                                <p class="text-white font-medium">{{ project.name }}</p>
+                                                <p class="text-gray-400 text-sm">{{ formatMetric(project.messageCount) }} mensajes</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xl font-bold text-white">{{ project.sessionCount }}</p>
+                                                <p class="text-green-400 text-sm">{{ project.activeCount }} activas</p>
                                             </div>
                                         </div>
-                                        <div class="text-right">
-                                            <p class="text-sm font-medium text-gray-900">
-                                                {{ (session.recent_messages || []).length }} messages
-                                            </p>
-                                            <i class="fas fa-chevron-right text-gray-400 text-sm mt-1"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Longest Sessions -->
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
+                                        <i class="fas fa-trophy text-yellow-400 mr-3"></i>
+                                        Sesiones Más Largas
+                                    </h3>
+                                </div>
+                                <div class="flex-1 p-6 overflow-y-auto">
+                                    <div class="space-y-3">
+                                        <div v-for="(session, index) in sessionsAnalytics.longestSessions" :key="session.session_id"
+                                             @click="selectProject(store.conversations.find(p => p.name === session.projectName))"
+                                             class="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
+                                            <div class="flex-1">
+                                                <p class="text-white font-mono text-sm">{{ session.session_id.substring(0, 8) }}</p>
+                                                <p class="text-gray-400 text-xs">{{ session.projectName }}</p>
+                                                <p class="text-gray-500 text-xs">{{ formatTimestamp(session.last_message) }}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-lg font-bold text-white">{{ session.messageCount || 0 }}</p>
+                                                <div class="flex items-center mt-1">
+                                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2" v-if="session.status === 'active'"></div>
+                                                    <span class="text-xs" :class="session.status === 'active' ? 'text-green-400' : 'text-gray-400'">
+                                                        {{ session.status === 'active' ? 'En vivo' : 'Completada' }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Real-time Status -->
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
+                                        <i class="fas fa-pulse text-green-400 mr-3"></i>
+                                        Estado en Tiempo Real
+                                    </h3>
+                                </div>
+                                <div class="flex-1 p-6 overflow-y-auto">
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-400">Sesiones activas</span>
+                                            <div class="flex items-center">
+                                                <div class="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                                <span class="text-white font-semibold">{{ sessionsAnalytics.activeSessions || 0 }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-400">Mensajes última hora</span>
+                                            <span class="text-white font-semibold">{{ store.liveStats.recent_activity?.messages_last_hour || 0 }}</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-400">Última actividad</span>
+                                            <span class="text-gray-300 text-sm">{{ formatTimestamp(lastUpdate) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Average Duration -->
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                                <div class="flex-shrink-0 px-6 py-4 border-b border-gray-700">
+                                    <h3 class="text-lg font-semibold text-white flex items-center">
+                                        <i class="fas fa-clock text-blue-400 mr-3"></i>
+                                        Duración Promedio
+                                    </h3>
+                                </div>
+                                <div class="flex-1 p-6 overflow-y-auto">
+                                    <div class="space-y-4">
+                                        <div class="text-center">
+                                            <p class="text-3xl font-bold text-white mb-2">{{ sessionsAnalytics.averageMessages || 0 }}</p>
+                                            <p class="text-gray-400">Mensajes por sesión</p>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4 text-center">
+                                            <div>
+                                                <p class="text-xl font-semibold text-green-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.75) }}</p>
+                                                <p class="text-gray-400 text-xs">Promedio IA</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xl font-semibold text-blue-400">{{ Math.round((sessionsAnalytics.averageMessages || 0) * 0.25) }}</p>
+                                                <p class="text-gray-400 text-xs">Promedio Usuario</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -978,9 +1505,10 @@ const OptimizedDashboard = {
                                     <h2 class="text-2xl font-bold text-gray-900">Session Details</h2>
                                     <p class="text-sm text-gray-500 mt-1">{{ store.selectedSession.session_id }}</p>
                                 </div>
-                                <button @click="setActiveView('sessions')" 
+                                <button @click="setActiveView(store.previousView === 'messages' ? 'messages' : 'sessions')" 
                                         class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
-                                    <i class="fas fa-arrow-left mr-2"></i>Back to Sessions
+                                    <i class="fas fa-arrow-left mr-2"></i>
+                                    {{ store.previousView === 'messages' ? 'Back to Messages' : 'Back to Sessions' }}
                                 </button>
                             </div>
                             
@@ -1056,6 +1584,171 @@ const OptimizedDashboard = {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Messages View -->
+                    <div v-else-if="store.activeView === 'messages'" class="h-full flex flex-col">
+                        <!-- Header Section -->
+                        <div class="flex-shrink-0 mb-6">
+                            <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div>
+                                    <h1 class="text-3xl font-bold text-white">Mensajes</h1>
+                                    <p class="text-gray-300 mt-1">
+                                        {{ filteredMessages.length }} mensajes encontrados
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-gray-300">Última actualización: {{ formatTimestamp(lastUpdate) }}</span>
+                            </div>
+                            </div>
+                        </div>
+
+                        <!-- Search and Filters Bar -->
+                        <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                            <div class="flex items-center space-x-3">
+                                <!-- Search Input -->
+                                <div class="flex-1">
+                                    <div class="relative">
+                                        <input 
+                                            v-model="store.messageFilters.search"
+                                            type="text" 
+                                            placeholder="Buscar contenido de mensajes..."
+                                            class="w-full pl-4 pr-20 py-2 bg-gray-700 dark:bg-gray-600 text-white placeholder-gray-400 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button class="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-white text-xs">
+                                            <i class="fas fa-search mr-1"></i>
+                                            Buscar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Clear Filters Button -->
+                                <button 
+                                    v-if="store.messageFilters.search || store.messageFilters.messageType || store.messageFilters.project || store.messageFilters.startDate"
+                                    @click="clearMessageFilters"
+                                    class="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm transition-colors"
+                                    title="Limpiar todos los filtros"
+                                >
+                                    <i class="fas fa-times mr-1"></i>
+                                    Limpiar
+                                </button>
+
+                                <!-- Message Type Filter -->
+                                <div class="w-44">
+                                    <select 
+                                        v-model="store.messageFilters.messageType"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Todos los tipos</option>
+                                        <option value="user">Mensajes de usuario</option>
+                                        <option value="assistant">Respuestas IA</option>
+                                        <option value="system">Sistema</option>
+                                    </select>
+                                </div>
+
+                                <!-- Project Filter -->
+                                <div class="w-48">
+                                    <select 
+                                        v-model="store.messageFilters.project"
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Todos los proyectos</option>
+                                        <option v-for="project in store.conversations" :key="project.name" :value="project.name">
+                                            {{ project.name }}
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <!-- Date Filter -->
+                                <div class="w-32">
+                                    <input 
+                                        v-model="store.messageFilters.startDate"
+                                        type="date" 
+                                        class="w-full px-3 py-2 bg-gray-700 dark:bg-gray-600 text-white placeholder-gray-400 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Messages List Content -->
+                        <div class="flex-1 bg-gray-800 dark:bg-gray-700 rounded-lg overflow-y-auto">
+                            <div class="divide-y divide-gray-600">
+                                <div 
+                                    v-for="message in filteredMessages" 
+                                    :key="message.id"
+                                    @click="selectMessage(message)"
+                                    class="px-6 py-4 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
+                                >
+                                    <div class="flex items-start space-x-4">
+                                        <!-- Message Type Icon -->
+                                        <div class="flex-shrink-0 mt-1">
+                                            <div v-if="message.type === 'user'" class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-user text-white text-xs"></i>
+                                            </div>
+                                            <div v-else-if="message.type === 'assistant'" class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-robot text-white text-xs"></i>
+                                            </div>
+                                            <div v-else class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-cog text-white text-xs"></i>
+                                            </div>
+                                        </div>
+
+                                        <!-- Message Content -->
+                                        <div class="flex-1 min-w-0">
+                                            <!-- Header with project and session info -->
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {{ message.project_name }}
+                                                </span>
+                                                <span class="text-gray-400 text-xs">
+                                                    {{ message.session_id.substring(0, 8) }}
+                                                </span>
+                                                <span class="text-gray-400 text-xs">
+                                                    •
+                                                </span>
+                                                <span class="text-gray-400 text-xs">
+                                                    {{ formatTimestamp(message.timestamp) }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Message content preview -->
+                                            <div class="text-white group-hover:text-blue-400">
+                                                <p class="text-sm line-clamp-2">
+                                                    {{ message.content.length > 150 ? message.content.substring(0, 150) + '...' : message.content }}
+                                                </p>
+                                            </div>
+
+                                            <!-- Session description if available -->
+                                            <div v-if="message.session_description" class="mt-1">
+                                                <span class="text-gray-500 text-xs italic">
+                                                    {{ message.session_description }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Right arrow -->
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-white transition-colors"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Empty state -->
+                            <div v-if="filteredMessages.length === 0" class="text-center py-12">
+                                <i class="fas fa-comments text-4xl text-gray-500 mb-4"></i>
+                                <p class="text-gray-400 text-lg mb-2">No se encontraron mensajes</p>
+                                <p v-if="store.allMessages.length === 0" class="text-gray-500 text-sm">
+                                    Los mensajes se cargarán automáticamente
+                                </p>
+                                <p v-else class="text-gray-500 text-sm">
+                                    Ajusta los filtros de búsqueda para ver más resultados
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </main>
             </div>
