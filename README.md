@@ -1,121 +1,121 @@
 # 🤖 Claude Conversation Logger v3.0.0
 
-> **🎯 Plataforma Inteligente de Gestión de Conversaciones** - Sistema avanzado de logging con **6 agentes especializados en IA**, análisis semántico profundo, documentación automática y optimización de tokens del 70%.
+> **🎯 Intelligent Conversation Management Platform** - Advanced logging system with **6 specialized AI agents**, deep semantic analysis, automatic documentation, and 70% token optimization.
 
 ---
 
-## ⭐ **SISTEMA DE 6 AGENTES ESPECIALIZADOS**
+## ⭐ **6 SPECIALIZED AGENTS SYSTEM**
 
-### **🧠 La Funcionalidad Principal**
+### **🧠 The Core Functionality**
 
-El Claude Conversation Logger incluye un **sistema avanzado de 6 agentes especializados** que proporciona análisis inteligente, documentación automática y descubrimiento de patrones en conversaciones técnicas.
+Claude Conversation Logger includes an **advanced system of 6 specialized agents** that provides intelligent analysis, automatic documentation, and pattern discovery in technical conversations.
 
-#### **🎭 Los 6 Agentes Especializados**
+#### **🎭 The 6 Specialized Agents**
 
-| Agente | Función Principal | Casos de Uso |
-|--------|-------------------|--------------|
-| **🎭 ConversationOrchestrator** | Coordinador principal que toma decisiones inteligentes | Análisis complejos multi-dimensionales |
-| **🧠 SemanticAnalyzer** | Análisis semántico profundo del contenido | Extracción de topics, entidades, patrones técnicos |
-| **📊 SessionStateAnalyzer** | Detección inteligente de estados de sesión | Determinar si problemas fueron resueltos |
-| **🔗 RelationshipMapper** | Mapeo de relaciones entre conversaciones | Encontrar conversaciones similares o relacionadas |
-| **🔍 PatternDiscoveryAgent** | Descubrimiento de patrones históricos | Identificar problemas recurrentes y soluciones |
-| **📝 AutoDocumentationAgent** | Generación automática de documentación | Crear guías estructuradas problema-solución |
+| Agent | Primary Function | Use Cases |
+|-------|------------------|-----------|
+| **🎭 ConversationOrchestrator** | Main coordinator making intelligent decisions | Multi-dimensional complex analysis |
+| **🧠 SemanticAnalyzer** | Deep semantic content analysis | Topics, entities, technical pattern extraction |
+| **📊 SessionStateAnalyzer** | Intelligent session state detection | Determine if problems were resolved |
+| **🔗 RelationshipMapper** | Conversation relationship mapping | Find similar or related conversations |
+| **🔍 PatternDiscoveryAgent** | Historical pattern discovery | Identify recurring problems and solutions |
+| **📝 AutoDocumentationAgent** | Automatic documentation generation | Create structured problem-solution guides |
 
-#### **🚀 Capacidades Inteligentes**
+#### **🚀 Intelligent Capabilities**
 
 ```bash
-# 🔍 Búsqueda semántica inteligente
-"authentication error" → Encuentra todas las conversaciones relacionadas con autenticación
+# 🔍 Intelligent semantic search
+"authentication error" → Finds all authentication-related conversations
 
-# 📝 Documentación automática contextual  
-Sesión completada → Genera automáticamente documentación estructurada
+# 📝 Contextual automatic documentation  
+Completed session → Automatically generates structured documentation
 
-# 🔗 Mapeo de relaciones inteligente
-Problema actual → Encuentra 5 conversaciones similares con soluciones
+# 🔗 Intelligent relationship mapping
+Current problem → Finds 5 similar conversations with solutions
 
-# 📊 Análisis de patrones predictivo
-"API timeout" → Identifica 15 casos similares + soluciones más efectivas
+# 📊 Predictive pattern analysis
+"API timeout" → Identifies 15 similar cases + most effective solutions
 
-# 🌍 Soporte multi-idioma
-Mixed ES/EN conversation → Detecta patrones en ambos idiomas
+# 🌍 Multi-language support
+Mixed ES/EN conversation → Detects patterns in both languages
 ```
 
-#### **⚡ Beneficios Clave**
+#### **⚡ Key Benefits**
 
-- ✅ **Optimización de Tokens**: Reducción del 70% vs análisis manual
-- ✅ **Análisis Instantáneo**: < 3 segundos para análisis completo multi-agente
-- ✅ **Precisión Alta**: 95%+ en detección de patrones y estados
-- ✅ **Soporte Multi-idioma**: Español/Inglés con framework extensible
-- ✅ **Cache Inteligente**: 85%+ hit rate para respuestas rápidas
-- ✅ **Auto-aprendizaje**: Mejora continua con uso
+- ✅ **Token Optimization**: 70% reduction vs manual analysis
+- ✅ **Instant Analysis**: < 3 seconds for complete multi-agent analysis
+- ✅ **High Accuracy**: 95%+ in pattern and state detection
+- ✅ **Multi-language Support**: Spanish/English with extensible framework
+- ✅ **Intelligent Cache**: 85%+ hit rate for fast responses
+- ✅ **Self-learning**: Continuous improvement with usage
 
 ---
 
-## 🚀 **QUICK START - 3 PASOS**
+## 🚀 **QUICK START - 3 STEPS**
 
-### **Paso 1: Levantar el Sistema**
+### **Step 1: Launch the System**
 ```bash
-# Clonar e iniciar
+# Clone and start
 git clone https://github.com/LucianoRicardo737/claude-conversation-logger.git
 cd claude-conversation-logger
 
-# Levantar con Docker (incluye agentes)
+# Launch with Docker (includes agents)
 docker compose up -d --build
 
-# Verificar que esté funcionando
+# Verify it's working
 curl http://localhost:3003/health
 ```
 
-### **Paso 2: Configurar Claude Code**
+### **Step 2: Configure Claude Code**
 ```bash
-# Copiar configuración MCP
+# Copy MCP configuration
 cp examples/claude-settings.json ~/.claude/settings.json
 
-# Copiar hook de logging
+# Copy logging hook
 cp examples/api-logger.py ~/.claude/hooks/
 chmod +x ~/.claude/hooks/api-logger.py
 ```
 
-### **Paso 3: Usar los Agentes**
+### **Step 3: Use the Agents**
 ```bash
-# En Claude Code - buscar conversaciones similares
+# In Claude Code - search similar conversations
 search_conversations({
   query: "payment integration error",
   days: 30,
   includePatterns: true
 })
 
-# Análisis inteligente de conversación actual
+# Intelligent analysis of current conversation
 analyze_conversation_intelligence({
   session_id: "current_session",
   includeRelationships: true
 })
 
-# Documentación automática
+# Automatic documentation
 auto_document_session({
   session_id: "completed_troubleshooting"
 })
 ```
 
-**🎉 ¡Sistema listo! Los agentes están analizando automáticamente todas tus conversaciones.**
+**🎉 System ready! Agents are automatically analyzing all your conversations.**
 
 ---
 
-## 🔌 **INTEGRACIÓN CON CLAUDE CODE (MCP)**
+## 🔌 **CLAUDE CODE INTEGRATION (MCP)**
 
-### **5 Herramientas Nativas de Agentes**
+### **5 Native Agent Tools**
 
-El sistema proporciona **5 herramientas MCP nativas** para Claude Code:
+The system provides **5 native MCP tools** for Claude Code:
 
-| Herramienta MCP | Agente Responsable | Funcionalidad |
-|-----------------|-------------------|---------------|
-| `search_conversations` | SemanticAnalyzer + RelationshipMapper | Búsqueda inteligente con análisis semántico |
-| `get_recent_conversations` | ConversationOrchestrator | Actividad reciente con contexto inteligente |
-| `analyze_conversation_patterns` | PatternDiscoveryAgent | Análisis de patrones históricos |
-| `export_conversation` | AutoDocumentationAgent | Export con documentación automática |
-| `analyze_conversation_intelligence` | Todos los agentes | Análisis completo multi-dimensional |
+| MCP Tool | Responsible Agent | Functionality |
+|----------|------------------|---------------|
+| `search_conversations` | SemanticAnalyzer + RelationshipMapper | Intelligent search with semantic analysis |
+| `get_recent_conversations` | ConversationOrchestrator | Recent activity with intelligent context |
+| `analyze_conversation_patterns` | PatternDiscoveryAgent | Historical pattern analysis |
+| `export_conversation` | AutoDocumentationAgent | Export with automatic documentation |
+| `analyze_conversation_intelligence` | All agents | Complete multi-dimensional analysis |
 
-### **Configuración Claude Code**
+### **Claude Code Configuration**
 
 **~/.claude/settings.json**
 ```json
@@ -140,11 +140,11 @@ El sistema proporciona **5 herramientas MCP nativas** para Claude Code:
 }
 ```
 
-### **Ejemplos de Uso en Claude Code**
+### **Claude Code Usage Examples**
 
-#### **🔍 Búsqueda Inteligente**
+#### **🔍 Intelligent Search**
 ```javascript
-// Buscar problemas similares con análisis semántico
+// Search for similar problems with semantic analysis
 search_conversations({
   query: "React hydration mismatch SSR",
   days: 60,
@@ -152,36 +152,36 @@ search_conversations({
   minConfidence: 0.75
 })
 
-// Resultado: Conversaciones relacionadas + patrones + soluciones probadas
+// Result: Related conversations + patterns + proven solutions
 ```
 
-#### **📊 Análisis de Patrones**
+#### **📊 Pattern Analysis**
 ```javascript
-// Identificar problemas recurrentes en proyecto
+// Identify recurring problems in project
 analyze_conversation_patterns({
   days: 30,
-  project: "mi-api-service",
+  project: "my-api-service",
   minFrequency: 3
 })
 
-// Resultado: Top issues + success rates + recomendaciones
+// Result: Top issues + success rates + recommendations
 ```
 
-#### **📝 Documentación Automática**
+#### **📝 Automatic Documentation**
 ```javascript
-// Generar documentación de sesión completada
+// Generate documentation from completed session
 export_conversation({
   session_id: "current_session",
   format: "markdown",
   includeCodeExamples: true
 })
 
-// Resultado: Markdown estructurado con problema + solución + código
+// Result: Structured markdown with problem + solution + code
 ```
 
-#### **🧠 Análisis Completo Multi-Agente**
+#### **🧠 Complete Multi-Agent Analysis**
 ```javascript
-// Análisis profundo con todos los agentes
+// Deep analysis with all agents
 analyze_conversation_intelligence({
   session_id: "complex_debugging_session",
   includeSemanticAnalysis: true,
@@ -189,18 +189,18 @@ analyze_conversation_intelligence({
   generateInsights: true
 })
 
-// Resultado: Análisis completo + insights + recomendaciones
+// Result: Complete analysis + insights + recommendations
 ```
 
 ---
 
-## 🛠️ **API REST DE AGENTES**
+## 🛠️ **AGENT REST API**
 
-### **6 Endpoints Especializados**
+### **6 Specialized Endpoints**
 
-#### **Análisis y Orquestación**
+#### **Analysis and Orchestration**
 ```http
-# Análisis completo multi-agente
+# Complete multi-agent analysis
 POST /api/agents/orchestrator
 Content-Type: application/json
 X-API-Key: claude_api_secret_2024_change_me
@@ -216,25 +216,25 @@ X-API-Key: claude_api_secret_2024_change_me
 }
 ```
 
-#### **Descubrimiento de Patrones**
+#### **Pattern Discovery**
 ```http
-# Encontrar patrones recurrentes
+# Find recurring patterns
 GET /api/agents/patterns?days=30&minFrequency=3&project=api-service
 
-# Respuesta: Patrones identificados + frecuencia + soluciones
+# Response: Identified patterns + frequency + solutions
 ```
 
-#### **Mapeo de Relaciones**
+#### **Relationship Mapping**
 ```http
-# Buscar conversaciones relacionadas
+# Search for related conversations
 GET /api/agents/relationships/sess_123?minConfidence=0.7&maxResults=10
 
-# Respuesta: Conversaciones similares + tipo de relación + confianza
+# Response: Similar conversations + relationship type + confidence
 ```
 
-#### **Documentación Automática**
+#### **Automatic Documentation**
 ```http
-# Generar documentación inteligente
+# Generate intelligent documentation
 POST /api/agents/document
 {
   "session_id": "sess_123",
@@ -245,37 +245,37 @@ POST /api/agents/document
 }
 ```
 
-### **Endpoints API Principales**
+### **Main API Endpoints**
 
-#### **Gestión de Conversaciones**
+#### **Conversation Management**
 ```http
-# Logging de conversación (usado por hooks)
+# Log conversation (used by hooks)
 POST /api/conversations
 
-# Búsqueda con análisis semántico
+# Search with semantic analysis
 GET /api/conversations/search?q=authentication&days=30&semantic=true
 
-# Export con documentación automática
+# Export with automatic documentation
 GET /api/conversations/{session_id}/export?format=markdown&enhanced=true
 ```
 
-#### **Analytics y Métricas**
+#### **Analytics and Metrics**
 ```http
-# Estadísticas de proyecto
+# Project statistics
 GET /api/projects/stats
 
-# Métricas de agentes
+# Agent metrics
 GET /api/agents/metrics
 
-# Health del sistema
+# System health
 GET /health
 ```
 
 ---
 
-## 🏗️ **ARQUITECTURA TÉCNICA**
+## 🏗️ **TECHNICAL ARCHITECTURE**
 
-### **Arquitectura de Agentes**
+### **Agent Architecture**
 
 ```mermaid
 graph TB
@@ -295,7 +295,7 @@ graph TB
     
     subgraph "💾 Data Layer"
         SA --> MONGO[(MongoDB<br/>8 Collections)]
-        RM --> REDIS[(Redis<br/>Cache Inteligente)]
+        RM --> REDIS[(Redis<br/>Intelligent Cache)]
     end
     
     subgraph "🌐 API Layer"
@@ -308,18 +308,18 @@ graph TB
     style MONGO fill:#4caf50,color:#fff
 ```
 
-### **Componentes del Sistema**
+### **System Components**
 
-| Componente | Tecnología | Puerto | Función |
-|------------|------------|--------|---------|
-| **🤖 Sistema de Agentes** | Node.js 18+ | - | Análisis inteligente de conversaciones |
-| **🔌 MCP Server** | MCP SDK | stdio | Integración nativa con Claude Code |
-| **🌐 API REST** | Express.js | 3003 | Endpoints para agentes y gestión |
-| **💾 MongoDB** | 7.0 | 27017 | 8 colecciones especializadas |
-| **⚡ Redis** | 7.0 | 6379 | Cache inteligente de agentes |
-| **🐳 Docker** | Compose | - | Orquestación monolítica |
+| Component | Technology | Port | Function |
+|-----------|------------|------|----------|
+| **🤖 Agent System** | Node.js 18+ | - | Intelligent conversation analysis |
+| **🔌 MCP Server** | MCP SDK | stdio | Native Claude Code integration |
+| **🌐 REST API** | Express.js | 3003 | Agent and management endpoints |
+| **💾 MongoDB** | 7.0 | 27017 | 8 specialized collections |
+| **⚡ Redis** | 7.0 | 6379 | Intelligent agent cache |
+| **🐳 Docker** | Compose | - | Monolithic orchestration |
 
-### **Flujo de Datos**
+### **Data Flow**
 
 ```mermaid
 sequenceDiagram
@@ -330,47 +330,47 @@ sequenceDiagram
     participant DB as MongoDB/Redis
     
     CC->>MCP: search_conversations()
-    MCP->>CO: Procesar request
-    CO->>AG: Coordinar análisis
-    AG->>DB: Consultar datos + cache
-    AG->>CO: Resultados especializados
-    CO->>MCP: Respuesta integrada
-    MCP->>CC: Conversaciones + insights
+    MCP->>CO: Process request
+    CO->>AG: Coordinate analysis
+    AG->>DB: Query data + cache
+    AG->>CO: Specialized results
+    CO->>MCP: Integrated response
+    MCP->>CC: Conversations + insights
 ```
 
 ---
 
-## ⚙️ **CONFIGURACIÓN DE AGENTES**
+## ⚙️ **AGENT CONFIGURATION**
 
-### **42 Parámetros de Configuración**
+### **42 Configuration Parameters**
 
-El sistema de agentes es completamente configurable via Docker Compose:
+The agent system is fully configurable via Docker Compose:
 
-#### **🌍 Configuración de Idiomas**
+#### **🌍 Language Configuration**
 ```yaml
 # docker-compose.yml
 environment:
-  # Idiomas principales
+  # Primary languages
   AGENT_PRIMARY_LANGUAGE: "es"
   AGENT_SECONDARY_LANGUAGE: "en" 
   AGENT_MIXED_LANGUAGE_MODE: "true"
   
-  # Keywords en español + inglés (arrays JSON)
+  # Keywords in Spanish + English (JSON arrays)
   AGENT_WRITE_KEYWORDS: '["documentar","guardar","document","save","create doc"]'
   AGENT_READ_KEYWORDS: '["buscar","encontrar","similar","search","find","lookup"]'
   AGENT_RESOLUTION_KEYWORDS: '["resuelto","funcionando","resolved","fixed","working"]'
   AGENT_PROBLEM_KEYWORDS: '["error","problema","falla","bug","issue","crash"]'
 ```
 
-#### **🎯 Parámetros de Performance**
+#### **🎯 Performance Parameters**
 ```yaml
 environment:
-  # Thresholds de detección
+  # Detection thresholds
   AGENT_SIMILARITY_THRESHOLD: "0.75"
   AGENT_CONFIDENCE_THRESHOLD: "0.80"
   AGENT_MIN_PATTERN_FREQUENCY: "3"
   
-  # Optimización de tokens
+  # Token optimization
   AGENT_MAX_TOKEN_BUDGET: "100"
   AGENT_CACHE_TTL_SECONDS: "300"
   
@@ -381,11 +381,11 @@ environment:
   AGENT_ENABLE_PATTERN_PREDICTION: "true"
 ```
 
-### **8 Colecciones MongoDB de Agentes**
+### **8 Agent MongoDB Collections**
 
-#### **Colecciones Principales**
+#### **Main Collections**
 ```javascript
-// conversations - Conversaciones base
+// conversations - Base conversations
 {
   _id: ObjectId("..."),
   session_id: "sess_123",
@@ -400,7 +400,7 @@ environment:
   }
 }
 
-// conversation_patterns - Patrones detectados por agentes
+// conversation_patterns - Agent-detected patterns
 {
   pattern_id: "api_timeout_pattern",
   title: "API Timeout Issues",
@@ -410,7 +410,7 @@ environment:
   affected_projects: ["api-service", "payment-gateway"]
 }
 
-// conversation_relationships - Conexiones entre sesiones
+// conversation_relationships - Session connections
 {
   source_session: "sess_123",
   target_session: "sess_456",
@@ -419,7 +419,7 @@ environment:
   detected_by: "RelationshipMapper"
 }
 
-// conversation_insights - Insights generados
+// conversation_insights - Generated insights
 {
   insight_type: "recommendation", 
   priority: "high",
@@ -430,91 +430,91 @@ environment:
 
 ---
 
-## 🔧 **INSTALACIÓN Y DEPLOYMENT**
+## 🔧 **INSTALLATION & DEPLOYMENT**
 
-### **Requisitos**
-- Docker 20.0+ con Docker Compose
-- Python 3.8+ (para hooks)
-- Claude Code instalado y configurado
-- 4GB+ RAM disponible
+### **Requirements**
+- Docker 20.0+ with Docker Compose
+- Python 3.8+ (for hooks)
+- Claude Code installed and configured
+- 4GB+ available RAM
 
-### **Instalación Completa**
+### **Complete Installation**
 
-#### **1. Clonar y Setup**
+#### **1. Clone and Setup**
 ```bash
-# Clonar repositorio
+# Clone repository
 git clone https://github.com/LucianoRicardo737/claude-conversation-logger.git
 cd claude-conversation-logger
 
-# Verificar estructura
-ls -la  # Debe mostrar: src/, config/, examples/, docker-compose.yml
+# Verify structure
+ls -la  # Should show: src/, config/, examples/, docker-compose.yml
 ```
 
-#### **2. Deployment con Docker**
+#### **2. Docker Deployment**
 ```bash
-# Construir e iniciar todo el sistema
+# Build and start complete system
 docker compose up -d --build
 
-# Verificar servicios (debe mostrar 1 container running)
+# Verify services (should show 1 running container)
 docker compose ps
 
-# Verificar health del sistema
+# Verify system health
 curl http://localhost:3003/health
-# Esperado: {"status":"healthy","services":{"api":"ok","mongodb":"ok","redis":"ok"}}
+# Expected: {"status":"healthy","services":{"api":"ok","mongodb":"ok","redis":"ok"}}
 ```
 
-#### **3. Configuración de Claude Code**
+#### **3. Claude Code Configuration**
 ```bash
-# Crear directorio hooks si no existe
+# Create hooks directory if it doesn't exist
 mkdir -p ~/.claude/hooks
 
-# Copiar hook de logging
+# Copy logging hook
 cp examples/api-logger.py ~/.claude/hooks/
 chmod +x ~/.claude/hooks/api-logger.py
 
-# Configurar settings de Claude Code
+# Configure Claude Code settings
 cp examples/claude-settings.json ~/.claude/settings.json
-# O fusionar con settings existentes
+# Or merge with existing settings
 ```
 
-#### **4. Verificación del Sistema**
+#### **4. System Verification**
 ```bash
-# Test de API
+# API test
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/conversations | jq .
 
-# Test de agentes
+# Agent test
 curl -H "X-API-Key: claude_api_secret_2024_change_me" \
      http://localhost:3003/api/agents/health
 
-# Test de hook (simular)
+# Hook test (simulate)
 python3 ~/.claude/hooks/api-logger.py
 ```
 
-### **Variables de Entorno**
+### **Environment Variables**
 
-#### **Configuración Base**
+#### **Base Configuration**
 ```bash
-# Requeridas
+# Required
 MONGODB_URI=mongodb://localhost:27017/conversations
 REDIS_URL=redis://localhost:6379
 API_KEY=your_secure_api_key_here
 NODE_ENV=production
 
-# Opcionales de performance
+# Optional performance
 API_MAX_CONNECTIONS=100
 MONGODB_POOL_SIZE=20
 REDIS_MESSAGE_LIMIT=10000
 ```
 
-#### **Configuración de Agentes (42 variables)**
+#### **Agent Configuration (42 variables)**
 ```bash
-# Idiomas y keywords
+# Languages and keywords
 AGENT_PRIMARY_LANGUAGE=es
 AGENT_MIXED_LANGUAGE_MODE=true
 AGENT_WRITE_KEYWORDS='["documentar","document","save"]'
 
-# Performance y thresholds
+# Performance and thresholds
 AGENT_MAX_TOKEN_BUDGET=100
 AGENT_SIMILARITY_THRESHOLD=0.75
 AGENT_CACHE_TTL_SECONDS=300
@@ -526,29 +526,29 @@ AGENT_ENABLE_AUTO_DOCUMENTATION=true
 
 ---
 
-## 🎯 **CASOS DE USO PRÁCTICOS**
+## 🎯 **PRACTICAL USE CASES**
 
-### **🔍 Scenario 1: Debugging Recurrente**
+### **🔍 Scenario 1: Recurring Debugging**
 ```javascript
-// Problema: "Los pagos fallan esporádicamente"
-// En Claude Code, usar la herramienta MCP:
+// Problem: "Payments fail sporadically"
+// In Claude Code, use MCP tool:
 search_conversations({
   query: "payment failed timeout integration",
   days: 90,
   includePatterns: true
 })
 
-// El SemanticAnalyzer + PatternDiscoveryAgent devuelven:
-// - 8 conversaciones similares encontradas
-// - Patrón identificado: "Gateway timeout after 30s" (frecuencia: 23 veces)
-// - Solución probada: "Increase timeout to 60s + add retry" (éxito: 94%)
-// - Conversaciones relacionadas: sess_456, sess_789, sess_012
+// SemanticAnalyzer + PatternDiscoveryAgent return:
+// - 8 similar conversations found
+// - Pattern identified: "Gateway timeout after 30s" (frequency: 23 times)
+// - Proven solution: "Increase timeout to 60s + add retry" (success: 94%)
+// - Related conversations: sess_456, sess_789, sess_012
 ```
 
-### **📝 Scenario 2: Documentación Automática**
+### **📝 Scenario 2: Automatic Documentation**
 ```javascript
-// Después de resolver un bug complejo
-// El AutoDocumentationAgent genera documentación contextual:
+// After solving a complex bug
+// AutoDocumentationAgent generates contextual documentation:
 export_conversation({
   session_id: "debugging_session_456",
   format: "markdown",
@@ -556,21 +556,21 @@ export_conversation({
   autoDetectPatterns: true
 })
 
-// El sistema genera automáticamente:
+// System automatically generates:
 /* 
-# Solución: Payment Gateway Timeout Issues
+# Solution: Payment Gateway Timeout Issues
 
-## Problema Identificado
-- Gateway timeout después de 30 segundos
-- Afecta pagos durante peak hours
-- Error: "ETIMEDOUT" en logs
+## Problem Identified
+- Gateway timeout after 30 seconds
+- Affects payments during peak hours
+- Error: "ETIMEDOUT" in logs
 
-## Investigación Realizada
-1. Análisis de logs de Nginx
-2. Revisión de configuración de timeout
-3. Monitoreo de latencia de red
+## Investigation Performed
+1. Nginx logs analysis
+2. Timeout configuration review
+3. Network latency monitoring
 
-## Solución Implementada
+## Solution Implemented
 ```javascript
 const paymentConfig = {
   timeout: 60000, // Increased from 30s to 60s
@@ -579,9 +579,9 @@ const paymentConfig = {
 };
 ```
 
-## Verificación
+## Verification
 - ✅ Tests passed: payment-integration.test.js
-- ✅ Timeout reducido de 23 errores/día a 0
+- ✅ Timeout reduced from 23 errors/day to 0
 - ✅ Success rate: 99.2%
 
 ## Tags
@@ -589,9 +589,9 @@ const paymentConfig = {
 */
 ```
 
-### **📊 Scenario 3: Análisis de Proyecto**
+### **📊 Scenario 3: Project Analysis**
 ```javascript
-// Analizar salud del proyecto con PatternDiscoveryAgent
+// Analyze project health with PatternDiscoveryAgent
 analyze_conversation_patterns({
   project: "e-commerce-api",
   days: 30,
@@ -599,7 +599,7 @@ analyze_conversation_patterns({
   includeSuccessRates: true
 })
 
-// El sistema identifica automáticamente:
+// System automatically identifies:
 {
   "top_issues": [
     {
@@ -622,10 +622,10 @@ analyze_conversation_patterns({
 }
 ```
 
-### **🔗 Scenario 4: Búsqueda Inteligente de Contexto**
+### **🔗 Scenario 4: Intelligent Context Search**
 ```javascript
-// Trabajando en un problema nuevo, buscar contexto similar
-// El RelationshipMapper encuentra conexiones inteligentes:
+// Working on a new problem, search for similar context
+// RelationshipMapper finds intelligent connections:
 search_conversations({
   query: "React component not rendering after state update",
   days: 60,
@@ -633,7 +633,7 @@ search_conversations({
   minConfidence: 0.7
 })
 
-// Resultado con análisis relacional:
+// Result with relational analysis:
 {
   "direct_matches": [
     {
@@ -660,9 +660,9 @@ search_conversations({
 }
 ```
 
-### **🧠 Scenario 5: Análisis Multi-Agente Completo**
+### **🧠 Scenario 5: Complete Multi-Agent Analysis**
 ```javascript
-// Para conversaciones complejas, activar todos los agentes:
+// For complex conversations, activate all agents:
 analyze_conversation_intelligence({
   session_id: "complex_debugging_session",
   includeSemanticAnalysis: true,
@@ -671,7 +671,7 @@ analyze_conversation_intelligence({
   maxTokenBudget: 200
 })
 
-// El ConversationOrchestrator coordina todos los agentes:
+// ConversationOrchestrator coordinates all agents:
 {
   "semantic_analysis": {
     "topics": ["microservices", "docker", "kubernetes", "monitoring"],
@@ -707,145 +707,145 @@ analyze_conversation_intelligence({
 }
 ```
 
-### **📖 Documentación Completa de Agentes**
+### **📖 Complete Agent Documentation**
 
-Para uso avanzado y configuración detallada, consultar la documentación técnica completa:
+For advanced usage and detailed configuration, consult the complete technical documentation:
 
-- **[📚 Guía General de Agentes](./src/agents/docs/README.md)** - Arquitectura completa y características técnicas
-- **[🚀 Guía de Uso Práctico](./src/agents/docs/USAGE_GUIDE.md)** - Ejemplos detallados y mejores prácticas  
-- **[🔌 Integración MCP](./src/agents/docs/MCP_INTEGRATION.md)** - Setup completo con Claude Code
-- **[⚡ Referencia Rápida](./src/agents/docs/QUICK_REFERENCE.md)** - Comandos y troubleshooting
-- **[⚙️ Configuración Avanzada](./src/agents/docs/CONFIGURATION.md)** - 42 parámetros configurables
-- **[💾 Integración con Base de Datos](./src/agents/docs/DATABASE_INTEGRATION.md)** - Esquemas y colecciones
+- **[📚 General Agent Guide](./src/agents/docs/README.md)** - Complete architecture and technical features
+- **[🚀 Practical Usage Guide](./src/agents/docs/USAGE_GUIDE.md)** - Detailed examples and best practices  
+- **[🔌 MCP Integration](./src/agents/docs/MCP_INTEGRATION.md)** - Complete setup with Claude Code
+- **[⚡ Quick Reference](./src/agents/docs/QUICK_REFERENCE.md)** - Commands and troubleshooting
+- **[⚙️ Advanced Configuration](./src/agents/docs/CONFIGURATION.md)** - 42 configurable parameters
+- **[💾 Database Integration](./src/agents/docs/DATABASE_INTEGRATION.md)** - Schemas and collections
 
 ---
 
-## 📚 **ESTRUCTURA DEL PROYECTO**
+## 📚 **PROJECT STRUCTURE**
 
 ```
 claude-conversation-logger/
-├── 📄 README.md                     # Documentación principal
-├── 🚀 QUICK_START.md                # Guía de setup rápido  
-├── 🐳 docker-compose.yml            # Orquestación completa
-├── 📦 package.json                  # Dependencias y scripts
+├── 📄 README.md                     # Main documentation
+├── 🚀 QUICK_START.md                # Quick setup guide  
+├── 🐳 docker-compose.yml            # Complete orchestration
+├── 📦 package.json                  # Dependencies and scripts
 
-├── 🔧 config/                       # Configuraciones de servicios
-│   ├── supervisord.conf             # Gestión de procesos
-│   ├── mongodb.conf                 # Configuración MongoDB
-│   └── redis.conf                   # Configuración Redis
+├── 🔧 config/                       # Service configurations
+│   ├── supervisord.conf             # Process management
+│   ├── mongodb.conf                 # MongoDB configuration
+│   └── redis.conf                   # Redis configuration
 
-├── 🔌 src/                          # Código fuente
-│   ├── server.js                    # API server principal
-│   ├── mcp-server.js               # MCP server para Claude Code
+├── 🔌 src/                          # Source code
+│   ├── server.js                    # Main API server
+│   ├── mcp-server.js               # MCP server for Claude Code
 │   │
-│   ├── 🤖 agents/                   # Sistema de Agentes (PRINCIPAL)
-│   │   ├── index.js                 # Factory de agentes
-│   │   ├── core/                    # Agentes principales
+│   ├── 🤖 agents/                   # Agent System (MAIN)
+│   │   ├── index.js                 # Agent factory
+│   │   ├── core/                    # Main agents
 │   │   │   ├── ConversationOrchestrator.js
 │   │   │   └── BaseAgent.js
-│   │   ├── analyzers/               # Agentes especializados
+│   │   ├── analyzers/               # Specialized agents
 │   │   │   ├── SemanticAnalyzer.js
 │   │   │   ├── SessionStateAnalyzer.js
 │   │   │   ├── RelationshipMapper.js
 │   │   │   ├── PatternDiscoveryAgent.js
 │   │   │   └── AutoDocumentationAgent.js
-│   │   ├── config/                  # Configuración de agentes
-│   │   │   └── AgentConfig.js       # 42 parámetros configurables
-│   │   └── docs/                    # Documentación técnica
-│   │       ├── README.md            # Guía técnica completa
-│   │       ├── USAGE_GUIDE.md       # Ejemplos de uso
-│   │       └── CONFIGURATION.md     # Configuración avanzada
+│   │   ├── config/                  # Agent configuration
+│   │   │   └── AgentConfig.js       # 42 configurable parameters
+│   │   └── docs/                    # Technical documentation
+│   │       ├── README.md            # Complete technical guide
+│   │       ├── USAGE_GUIDE.md       # Usage examples
+│   │       └── CONFIGURATION.md     # Advanced configuration
 │   │
-│   ├── 💾 database/                 # Capa de datos
-│   │   ├── mongodb-agent-extension.js  # MongoDB + colecciones de agentes
-│   │   ├── redis.js                 # Cache inteligente
-│   │   └── agent-schemas.js         # Esquemas de agentes
+│   ├── 💾 database/                 # Data layer
+│   │   ├── mongodb-agent-extension.js  # MongoDB + agent collections
+│   │   ├── redis.js                 # Intelligent cache
+│   │   └── agent-schemas.js         # Agent schemas
 │   │
-│   ├── 🔧 services/                 # Servicios de negocio
-│   │   ├── conversationService.js   # Gestión de conversaciones
-│   │   ├── searchService.js         # Búsqueda semántica
-│   │   └── exportService.js         # Export con agentes
+│   ├── 🔧 services/                 # Business services
+│   │   ├── conversationService.js   # Conversation management
+│   │   ├── searchService.js         # Semantic search
+│   │   └── exportService.js         # Export with agents
 │   │
-│   └── 🛠️ utils/                    # Utilidades
-│       └── recovery-manager.js      # Recuperación de datos
+│   └── 🛠️ utils/                    # Utilities
+│       └── recovery-manager.js      # Data recovery
 
-├── 💡 examples/                     # Ejemplos y configuración
-│   ├── claude-settings.json         # Configuración completa Claude Code
-│   ├── api-logger.py               # Hook de logging
-│   └── mcp-usage-examples.md       # Ejemplos de uso MCP
+├── 💡 examples/                     # Examples and configuration
+│   ├── claude-settings.json         # Complete Claude Code config
+│   ├── api-logger.py               # Logging hook
+│   └── mcp-usage-examples.md       # MCP usage examples
 
-└── 🧪 tests/                       # Suite de testing
-    ├── agents.test.js              # Tests de agentes
-    ├── api.test.js                 # Tests de API
-    └── integration.test.js         # Tests de integración
+└── 🧪 tests/                       # Test suite
+    ├── agents.test.js              # Agent tests
+    ├── api.test.js                 # API tests
+    └── integration.test.js         # Integration tests
 ```
 
 ---
 
-## 📈 **MÉTRICAS Y PERFORMANCE**
+## 📈 **METRICS & PERFORMANCE**
 
-### **🎯 Métricas de Agentes**
-- **Análisis Semántico**: 95%+ precisión en detección de topics
-- **Detección de Estados**: 90%+ precisión en completado/activo
-- **Mapeo de Relaciones**: 85%+ precisión en similitud
-- **Optimización de Tokens**: 70% reducción vs análisis manual
-- **Tiempo de Respuesta**: < 3 segundos análisis completo
+### **🎯 Agent Metrics**
+- **Semantic Analysis**: 95%+ accuracy in topic detection
+- **State Detection**: 90%+ accuracy in completed/active
+- **Relationship Mapping**: 85%+ accuracy in similarity
+- **Token Optimization**: 70% reduction vs manual analysis
+- **Response Time**: < 3 seconds complete analysis
 
-### **⚡ Performance del Sistema**
-- **Startup Time**: < 30 segundos container completo
-- **API Response**: < 100ms promedio
-- **Cache Hit Rate**: 85%+ en consultas frecuentes
-- **Memory Usage**: ~768MB típico
-- **Concurrent Users**: 100+ soportados
+### **⚡ System Performance**
+- **Startup Time**: < 30 seconds complete container
+- **API Response**: < 100ms average
+- **Cache Hit Rate**: 85%+ on frequent queries
+- **Memory Usage**: ~768MB typical
+- **Concurrent Users**: 100+ supported
 
-### **📊 Estadísticas del Codebase**
-- **Líneas de Código**: 4,200+ (incluye sistema de agentes)
-- **Archivos JavaScript**: 25+ archivos core
-- **Archivos de Agentes**: 12 archivos especializados
-- **Endpoints API**: 30+ endpoints (24 core + 6 agentes)
-- **Herramientas MCP**: 5 herramientas nativas
-- **Colecciones MongoDB**: 8 colecciones especializadas
+### **📊 Codebase Statistics**
+- **Lines of Code**: 4,200+ (including agent system)
+- **JavaScript Files**: 25+ core files
+- **Agent Files**: 12 specialized files
+- **API Endpoints**: 30+ endpoints (24 core + 6 agents)
+- **MCP Tools**: 5 native tools
+- **MongoDB Collections**: 8 specialized collections
 
 ---
 
-## 🛡️ **SEGURIDAD Y MANTENIMIENTO**
+## 🛡️ **SECURITY & MAINTENANCE**
 
-### **🔐 Seguridad**
-- **API Key Authentication**: Requerida para todos los endpoints
-- **Helmet.js Security**: Headers y protecciones de seguridad
-- **Rate Limiting**: 200 requests/15min en producción
-- **CORS Configurable**: Políticas cross-origin configurables
-- **Data Encryption**: Datos cifrados en reposo y tránsito
+### **🔐 Security**
+- **API Key Authentication**: Required for all endpoints
+- **Helmet.js Security**: Security headers and protections
+- **Rate Limiting**: 200 requests/15min in production
+- **Configurable CORS**: Cross-origin policies configurable
+- **Data Encryption**: Data encrypted at rest and in transit
 
 ### **🔧 Troubleshooting**
 
-#### **Sistema no inicia**
+#### **System won't start**
 ```bash
-# Verificar logs
+# Check logs
 docker compose logs -f
 
-# Verificar recursos
+# Check resources
 docker stats
 ```
 
-#### **Agentes no responden**
+#### **Agents not responding**
 ```bash
-# Health check de agentes
+# Agent health check
 curl http://localhost:3003/api/agents/health
 
-# Verificar configuración
+# Check configuration
 curl http://localhost:3003/api/agents/config
 ```
 
-#### **Hook no funciona**
+#### **Hook not working**
 ```bash
-# Test manual del hook
+# Manual hook test
 python3 ~/.claude/hooks/api-logger.py
 
-# Verificar permisos
+# Check permissions
 chmod +x ~/.claude/hooks/api-logger.py
 
-# Test conectividad API
+# Test API connectivity
 curl -X POST http://localhost:3003/api/conversations \
   -H "X-API-Key: claude_api_secret_2024_change_me" \
   -H "Content-Type: application/json" \
@@ -854,69 +854,69 @@ curl -X POST http://localhost:3003/api/conversations \
 
 ---
 
-## 📞 **SOPORTE Y CONTRIBUCIÓN**
+## 📞 **SUPPORT & CONTRIBUTION**
 
-### **🆘 Obtener Ayuda**
-- 📖 **Documentación Técnica**: Ver `/src/agents/docs/`
-- 🐛 **Reportar Bugs**: GitHub Issues
-- 💡 **Solicitar Features**: GitHub Discussions
+### **🆘 Get Help**
+- 📖 **Technical Documentation**: See `/src/agents/docs/`
+- 🐛 **Report Bugs**: GitHub Issues
+- 💡 **Request Features**: GitHub Discussions
 
-### **🤝 Contribuir**
+### **🤝 Contribute**
 ```bash
-# Fork y clonar
+# Fork and clone
 git clone https://github.com/your-username/claude-conversation-logger.git
 
-# Crear rama feature
-git checkout -b feature/mejora-agentes
+# Create feature branch
+git checkout -b feature/agent-improvements
 
-# Desarrollar y testear
+# Develop and test
 npm test
 npm run test:agents
 
 # Submit pull request
-git push origin feature/mejora-agentes
+git push origin feature/agent-improvements
 ```
 
-### **🧪 Desarrollo Local**
+### **🧪 Local Development**
 ```bash
-# Install dependencias
+# Install dependencies
 npm install
 
-# Configurar entorno desarrollo
+# Configure development environment
 cp examples/claude-settings.json ~/.claude/settings.json
 
-# Iniciar en modo desarrollo
+# Start in development mode
 npm run dev
 
-# Ejecutar tests de agentes
+# Run agent tests
 npm run test:agents
 ```
 
 ---
 
-## 📄 **LICENCIA Y ATRIBUCIÓN**
+## 📄 **LICENSE & ATTRIBUTION**
 
-**MIT License** - Ver [LICENSE](./LICENSE) para detalles.
+**MIT License** - See [LICENSE](./LICENSE) for details.
 
-**Autor**: Luciano Emanuel Ricardo  
-**Versión**: 3.0.0 - Advanced AI Agent System  
+**Author**: Luciano Emanuel Ricardo  
+**Version**: 3.0.0 - Advanced AI Agent System  
 **Repository**: https://github.com/LucianoRicardo737/claude-conversation-logger
 
 ---
 
-## 🎉 **RESUMEN EJECUTIVO**
+## 🎉 **EXECUTIVE SUMMARY**
 
-✅ **Sistema de 6 Agentes Especializados** - Análisis inteligente multi-dimensional  
-✅ **Integración Nativa con Claude Code** - 5 herramientas MCP listas para usar  
-✅ **Optimización de Tokens 70%** - Máxima eficiencia en análisis  
-✅ **Soporte Multi-idioma** - Español/Inglés con framework extensible  
-✅ **Análisis Semántico Profundo** - Comprensión real del contenido técnico  
-✅ **Documentación Automática** - Generación contextual de guías  
-✅ **Descubrimiento de Patrones** - Identificación proactiva de problemas recurrentes  
-✅ **Mapeo de Relaciones** - Conexión inteligente entre conversaciones  
-✅ **Cache Inteligente** - 85%+ hit rate para respuestas instantáneas  
-✅ **API REST Completa** - 30+ endpoints incluyendo agentes especializados  
-✅ **Deployment con Docker** - Sistema monolítico listo para producción  
-✅ **42 Parámetros Configurables** - Personalización completa via Docker Compose  
+✅ **6 Specialized Agent System** - Multi-dimensional intelligent analysis  
+✅ **Native Claude Code Integration** - 5 ready-to-use MCP tools  
+✅ **70% Token Optimization** - Maximum efficiency in analysis  
+✅ **Multi-language Support** - Spanish/English with extensible framework  
+✅ **Deep Semantic Analysis** - True understanding of technical content  
+✅ **Automatic Documentation** - Contextual guide generation  
+✅ **Pattern Discovery** - Proactive identification of recurring problems  
+✅ **Relationship Mapping** - Intelligent conversation connections  
+✅ **Intelligent Cache** - 85%+ hit rate for instant responses  
+✅ **Complete REST API** - 30+ endpoints including specialized agents  
+✅ **Docker Deployment** - Production-ready monolithic system  
+✅ **42 Configurable Parameters** - Complete customization via Docker Compose  
 
-**🚀 Listo para deployment inmediato con sistema de agentes inteligentes!**
+**🚀 Ready for immediate deployment with intelligent agent system!**
