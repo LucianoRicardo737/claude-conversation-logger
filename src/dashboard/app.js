@@ -1564,22 +1564,6 @@ const OptimizedDashboard = {
 
                     <!-- Messages View -->
                     <div v-else-if="store.activeView === 'messages'" class="h-full flex flex-col">
-                        <!-- Header Section -->
-                        <div class="flex-shrink-0 mb-6">
-                            <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-4">
-                                <div>
-                                    <h1 class="text-3xl font-bold text-white">Mensajes</h1>
-                                    <p class="text-gray-300 mt-1">
-                                        {{ filteredMessages.length }} mensajes encontrados
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-3">
-                                <span class="text-gray-300">Última actualización: {{ formatTimestamp(lastUpdate) }}</span>
-                            </div>
-                            </div>
-                        </div>
 
                         <!-- Search and Filters Bar -->
                         <div class="flex-shrink-0 bg-gray-800 dark:bg-gray-700 rounded-lg p-3 mb-4">
@@ -1655,7 +1639,7 @@ const OptimizedDashboard = {
                                     v-for="message in filteredMessages" 
                                     :key="message.id"
                                     @click="selectMessage(message)"
-                                    class="px-6 py-4 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
+                                    class="px-4 py-3 hover:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer transition-colors group"
                                 >
                                     <div class="flex items-start space-x-4">
                                         <!-- Message Type Icon -->
